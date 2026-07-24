@@ -1,0 +1,458 @@
+{
+  "id": "ZBcm5QMEPpI1TARO",
+  "name": "CALENDARIO - VERIFICAR DISPONIBILIDADE",
+  "nodes": [
+    {
+      "id": "35028ed7-1c8a-4ff5-8768-4ee683e7b2f9",
+      "name": "GATILHO",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "company_id",
+              "type": "string"
+            },
+            {
+              "name": "data_desejada",
+              "type": "string"
+            },
+            {
+              "name": "hora_desejada",
+              "type": "string"
+            },
+            {
+              "name": "resource_nome",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "73249f48-bb90-48cd-adca-34d7e79714c1",
+      "name": "BUSCAR CONFIG",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/resources?select=id,name,calendar_id,exige_pagamento,valor_sinal,tipo_cobranca,agenda_config(dias_semana,hora_inicio,hora_fim,duracao_minutos,buffer_minutos,max_por_dia)&company_id=eq.{{ $('GATILHO').item.json.company_id }}&active=eq.true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "54bf6210-6988-42fe-9516-820301a85982",
+      "name": "BUSCAR TOKEN CAL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/functions/v1/get-calendar-token",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "company_id",
+              "value": "={{ $('GATILHO').item.json.company_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxYmVqdmh1YXZ6amVrem5vdWFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2ODY1NDMsImV4cCI6MjEwMDI2MjU0M30.VyulYtfVCpldH4OV8uDebVQumHcLmPJzFUENUpMzDoE"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "b3819313-758b-45bf-a23e-60e3672b2353",
+      "name": "VALIDAR",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "jsCode": "\nfunction normalizeWords(s) {\n  var n = (s || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase();\n  n = n.replace(/[^a-z0-9]+/g, ' ').trim();\n  return n.length ? n.split(/\\s+/).filter(function(w){ return w.length >= 2; }) : [];\n}\nfunction pickResource(resources, resourceNome) {\n  if (resources.length === 0) return { match: null, ambiguous: false, empty: true };\n  if (resources.length === 1) return { match: resources[0], ambiguous: false, empty: false };\n  if (!resourceNome) return { match: null, ambiguous: true, empty: false };\n  var searchWords = normalizeWords(resourceNome);\n  var scored = resources.map(function(r) {\n    var nameWords = normalizeWords(r.name);\n    var overlap = searchWords.filter(function(w){ return nameWords.indexOf(w) !== -1; }).length;\n    return { r: r, overlap: overlap };\n  });\n  var maxOverlap = Math.max.apply(null, scored.map(function(s){ return s.overlap; }));\n  var best = scored.filter(function(s){ return s.overlap === maxOverlap; });\n  if (maxOverlap > 0 && best.length === 1) return { match: best[0].r, ambiguous: false, empty: false };\n  return { match: null, ambiguous: true, empty: false };\n}\nvar g = $('GATILHO').item.json; var resources = $('BUSCAR CONFIG').all().map(function(i) { return i.json; }); var pick = pickResource(resources, g.resource_nome); if (pick.empty) { return [{ json: { ok: false, motivo: 'Nenhum profissional/agenda configurado para esta empresa.', refreshToken: '', calendarId: '', maxPorDia: 0, duracao: 0, horaInicio: '', horaFim: '', resourceId: '' } }]; } if (pick.ambiguous) { var ids = resources.map(function(r){ return r.name; }).join(', '); return [{ json: { ok: false, motivo: 'Nao consegui identificar com certeza qual profissional/especialista o cliente quer. Pergunte ao cliente qual deles e informe o nome exato em resource_nome. Opcoes: ' + ids + '.', refreshToken: '', calendarId: '', maxPorDia: 0, duracao: 0, horaInicio: '', horaFim: '', resourceId: '' } }]; } var res = pick.match; var cfg = res.agenda_config || {}; var tk = $('BUSCAR TOKEN CAL').item.json; var diasRaw = cfg.dias_semana; var diasSemana; if (Array.isArray(diasRaw)) { diasSemana = diasRaw.map(Number); } else if (typeof diasRaw === 'string') { diasSemana = diasRaw.replace(/[\\{\\}]/g,'').split(',').map(Number); } else { diasSemana = [1,2,3,4,5]; } var horaInicio = cfg.hora_inicio || '08:00'; var horaFim = cfg.hora_fim || '18:00'; var maxPorDia = parseInt(cfg.max_por_dia) || 5; var duracao = parseInt(cfg.duracao_minutos) || 60; var refreshToken = tk.refresh_token || ''; var calendarId = res.calendar_id || tk.calendar_id || 'primary'; var data = g.data_desejada; var hora = g.hora_desejada; var d = new Date(data + 'T12:00:00'); var diaSemana = d.getDay(); if (diasSemana.indexOf(diaSemana) === -1) { var nomes = ['domingo','segunda','terca','quarta','quinta','sexta','sabado']; return [{ json: { ok: false, motivo: 'Empresa nao atende neste dia (' + nomes[diaSemana] + '). Dias disponiveis: ' + diasSemana.map(function(x){ return nomes[x]; }).join(', '), refreshToken: '', calendarId: '', maxPorDia: 0, duracao: 0, horaInicio: horaInicio, horaFim: horaFim, resourceId: res.id } }]; } var p1 = horaInicio.split(':'); var hIni = parseInt(p1[0])*60+parseInt(p1[1]); var p2 = horaFim.split(':'); var hFimN = parseInt(p2[0])*60+parseInt(p2[1]); var p3 = hora.split(':'); var hDes = parseInt(p3[0])*60+parseInt(p3[1]); if (hDes < hIni || hDes + duracao > hFimN) { return [{ json: { ok: false, motivo: 'Empresa atende das ' + horaInicio + ' as ' + horaFim + '. Horario ' + hora + ' fora do horario de atendimento.', refreshToken: '', calendarId: '', maxPorDia: 0, duracao: 0, horaInicio: horaInicio, horaFim: horaFim, resourceId: res.id } }]; } if (!refreshToken) { return [{ json: { ok: false, motivo: 'Google Calendar nao conectado para esta conta.', refreshToken: '', calendarId: '', maxPorDia: 0, duracao: 0, horaInicio: horaInicio, horaFim: horaFim, resourceId: res.id } }]; } return [{ json: { ok: true, motivo: '', refreshToken: refreshToken, calendarId: calendarId, maxPorDia: maxPorDia, duracao: duracao, horaInicio: horaInicio, horaFim: horaFim, resourceId: res.id, exige_pagamento: !!res.exige_pagamento, valor_sinal: res.valor_sinal, tipo_cobranca: res.tipo_cobranca } }];"
+      }
+    },
+    {
+      "id": "5fb31ed8-c99d-4133-aec7-f377d3d496cd",
+      "name": "PODE VERIFICAR?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "44fca90c-a05a-4a4a-a42a-4d73c38131aa",
+      "name": "RENOVAR TOKEN CAL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1440,
+        -120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://oauth2.googleapis.com/token",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "refresh_token",
+              "value": "={{ $json.refreshToken }}"
+            },
+            {
+              "name": "client_id",
+              "value": "{{ $env.GOOGLE_CLIENT_ID }}"
+            },
+            {
+              "name": "client_secret",
+              "value": "{{ $env.GOOGLE_CLIENT_SECRET }}"
+            },
+            {
+              "name": "grant_type",
+              "value": "refresh_token"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "67053516-5558-420c-a89b-7a889194f63b",
+      "name": "BUSCAR EVENTOS DIA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1680,
+        -120
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('VALIDAR').item.json.calendarId) }}/events",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "timeMin",
+              "value": "={{ $('GATILHO').item.json.data_desejada }}T00:00:00-03:00"
+            },
+            {
+              "name": "timeMax",
+              "value": "={{ $('GATILHO').item.json.data_desejada }}T23:59:59-03:00"
+            },
+            {
+              "name": "singleEvents",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9b73c7fe-32c9-48dc-9f3e-346d3d30f493",
+      "name": "ANALISAR SLOTS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        -120
+      ],
+      "parameters": {
+        "jsCode": "var g = $('GATILHO').item.json; var v = $('VALIDAR').item.json; var eventos = $json.items || []; var duracao = v.duracao; var maxPorDia = v.maxPorDia; var hora = g.hora_desejada; var evComHorario = eventos.filter(function(e){ return e.start && e.start.dateTime; }); if (evComHorario.length >= maxPorDia) { return [{ json: { disponivel: false, motivo: 'Agenda cheia para este dia (maximo: ' + maxPorDia + ' agendamentos).', slots_livres: [] } }]; } var p = hora.split(':'); var h = parseInt(p[0])*60+parseInt(p[1]); var hFim = h+duracao; var conflito = evComHorario.find(function(e){ var s=new Date(e.start.dateTime); var en=e.end&&e.end.dateTime?new Date(e.end.dateTime):new Date(s.getTime()+duracao*60000); var eS=s.getHours()*60+s.getMinutes(); var eE=en.getHours()*60+en.getMinutes(); return h<eE&&hFim>eS; }); if (conflito) { return [{ json: { disponivel: false, motivo: 'Horario ' + hora + ' ja esta ocupado. Escolha outro horario.', slots_livres: [] } }]; } var ip=v.horaInicio.split(':'); var hIni=parseInt(ip[0])*60+parseInt(ip[1]); var fp=v.horaFim.split(':'); var hFimC=parseInt(fp[0])*60+parseInt(fp[1]); var slots=[]; for(var slot=hIni; slot+duracao<=hFimC && slots.length<6; slot+=duracao){ var sh=Math.floor(slot/60).toString().padStart(2,'0'); var sm=(slot%60).toString().padStart(2,'0'); var sl=sh+':'+sm; var sf=slot+duracao; var livre=!evComHorario.find(function(e){ var s=new Date(e.start.dateTime); var en=e.end&&e.end.dateTime?new Date(e.end.dateTime):new Date(s.getTime()+duracao*60000); var eS=s.getHours()*60+s.getMinutes(); var eE=en.getHours()*60+en.getMinutes(); return slot<eE&&sf>eS; }); if(livre) slots.push(sl); } return [{ json: { disponivel: true, motivo: 'Horario ' + hora + ' disponivel!', agendamentos_hoje: evComHorario.length, capacidade_restante: maxPorDia-evComHorario.length, slots_livres: slots, exige_pagamento: v.exige_pagamento, valor_sinal: v.valor_sinal, tipo_cobranca: v.tipo_cobranca } }];"
+      }
+    },
+    {
+      "id": "2336b3aa-a3ae-4bad-b795-8ac47c1a8658",
+      "name": "RETORNAR",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2160,
+        -120
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": []
+        }
+      }
+    },
+    {
+      "id": "db14f176-1a7f-467c-b6a7-7d6096957cf9",
+      "name": "RETORNAR BLOQUEADO",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1440,
+        120
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "disponivel",
+              "name": "disponivel",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "motivo",
+              "name": "motivo",
+              "value": "={{ $json.motivo }}",
+              "type": "string"
+            },
+            {
+              "id": "slots_livres",
+              "name": "slots_livres",
+              "value": "[]",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "buscar-bloqueios-verif",
+      "name": "BUSCAR BLOQUEIOS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1080,
+        0
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/agenda_bloqueios?select=resource_id,periodo,motivo&company_id=eq.{{ $('GATILHO').item.json.company_id }}&data=eq.{{ $('GATILHO').item.json.data_desejada }}&or=(resource_id.is.null,resource_id.eq.{{ $('VALIDAR').item.json.resourceId }})",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "checar-bloqueio-verif",
+      "name": "CHECAR BLOQUEIO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const v = $('VALIDAR').item.json;\nif (!v.ok) { return [{ json: v }]; }\nconst bloqueios = $json || [];\nconst hora = $('GATILHO').item.json.hora_desejada || '00:00';\nconst hh = parseInt(hora.split(':')[0], 10);\nfunction periodoBate(periodo) {\n  if (periodo === 'dia_todo') return true;\n  if (periodo === 'manha') return hh < 12;\n  if (periodo === 'tarde') return hh >= 12 && hh < 18;\n  if (periodo === 'noite') return hh >= 18;\n  return false;\n}\nconst bloqueado = bloqueios.find(function(b) { return periodoBate(b.periodo); });\nif (bloqueado) {\n  const motivo = 'Agenda bloqueada nesse periodo' + (bloqueado.motivo ? ' (' + bloqueado.motivo + ')' : '') + '.';\n  return [{ json: Object.assign({}, v, { ok: false, motivo: motivo }) }];\n}\nreturn [{ json: v }];"
+      }
+    }
+  ],
+  "connections": {
+    "GATILHO": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR CONFIG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VALIDAR": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR BLOQUEIOS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PODE VERIFICAR?": {
+      "main": [
+        [
+          {
+            "node": "RENOVAR TOKEN CAL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RETORNAR BLOQUEADO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RENOVAR TOKEN CAL": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR EVENTOS DIA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR EVENTOS DIA": {
+      "main": [
+        [
+          {
+            "node": "ANALISAR SLOTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ANALISAR SLOTS": {
+      "main": [
+        [
+          {
+            "node": "RETORNAR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR CONFIG": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR TOKEN CAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR TOKEN CAL": {
+      "main": [
+        [
+          {
+            "node": "VALIDAR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR BLOQUEIOS": {
+      "main": [
+        [
+          {
+            "node": "CHECAR BLOQUEIO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CHECAR BLOQUEIO": {
+      "main": [
+        [
+          {
+            "node": "PODE VERIFICAR?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}

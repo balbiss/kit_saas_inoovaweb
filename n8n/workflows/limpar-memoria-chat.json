@@ -1,0 +1,84 @@
+{
+  "id": "GjFPKJVE6h9yiWNx",
+  "name": "LIMPAR MEMORIA CHAT",
+  "nodes": [
+    {
+      "id": "webhook-limpar-memoria",
+      "name": "GATILHO",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "limpar-memoria-ia",
+        "options": {}
+      },
+      "webhookId": "limpar-memoria-ia-webhook"
+    },
+    {
+      "id": "validar-limpar-memoria",
+      "name": "VALIDAR",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const body = $json.body || {};\nif (body.secret !== 'limpar_memoria_ia_inoovaweb_2026') { throw new Error('Nao autorizado'); }\nconst idConta = body.id_conta;\nconst telefone = (body.telefone || '').replace(/[^0-9+]/g, '');\nif (!idConta || !telefone) { throw new Error('id_conta e telefone sao obrigatorios'); }\nconst sessionId = idConta + '_' + telefone;\nreturn [{ json: { session_id: sessionId } }];"
+      }
+    },
+    {
+      "id": "deletar-memoria-scoped",
+      "name": "DELETAR MEMORIA",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=DELETE FROM n8n_chat_historico_mensagens WHERE session_id = '{{ $json.session_id }}'",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HcfnrNOxcvDi7h8H",
+          "name": "chatwoot_db"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "GATILHO": {
+      "main": [
+        [
+          {
+            "node": "VALIDAR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VALIDAR": {
+      "main": [
+        [
+          {
+            "node": "DELETAR MEMORIA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}

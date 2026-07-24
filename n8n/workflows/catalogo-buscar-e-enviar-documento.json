@@ -1,0 +1,312 @@
+{
+  "id": "iywsRyWTmdeUxdIM",
+  "name": "CATALOGO - BUSCAR E ENVIAR DOCUMENTO",
+  "nodes": [
+    {
+      "id": "gatilho-doc",
+      "name": "GATILHO",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "company_id",
+              "type": "string"
+            },
+            {
+              "name": "termo_busca",
+              "type": "string"
+            },
+            {
+              "name": "id_conversa",
+              "type": "number"
+            },
+            {
+              "name": "url_chatwoot",
+              "type": "string"
+            },
+            {
+              "name": "token",
+              "type": "string"
+            },
+            {
+              "name": "chatwoot_account_id",
+              "type": "number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "preparar-busca-doc",
+      "name": "PREPARAR BUSCA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst out = items.map(function(it) {\n  const j = it.json || {};\n  const kw = (j.termo_busca || '').replace(/'/g, \"''\");\n  const merged = {};\n  for (const k in j) { merged[k] = j[k]; }\n  merged.like_kw = '*' + kw + '*';\n  return { json: merged };\n});\nreturn out;",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "buscar-documento",
+      "name": "BUSCAR DOCUMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/company_documents?select=title,file_url,content_type&company_id=eq.{{ $json.company_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "processar-doc",
+      "name": "PROCESSAR",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "function normalizeWords(s) {\n  var n = (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();\n  n = n.replace(/[^a-z0-9]+/g, ' ').trim();\n  return n.length ? n.split(/\\s+/).filter(function(w){ return w.length >= 2; }) : [];\n}\nvar docs = $input.all().map(function(i){ return i.json; });\nvar termo = $('GATILHO').item.json.termo_busca || '';\nvar searchWords = normalizeWords(termo);\nvar scored = docs.filter(function(d){ return d && d.title; }).map(function(doc) {\n  var titleWords = normalizeWords(doc.title);\n  var overlap = searchWords.filter(function(w){ return titleWords.indexOf(w) !== -1; }).length;\n  return { doc: doc, overlap: overlap };\n});\nscored.sort(function(a, b){ return b.overlap - a.overlap; });\nvar best = scored[0];\nif (!scored.length || !best || best.overlap === 0) {\n  return [{ json: { texto: 'Nao encontrei nenhum documento com esse nome.', arquivo_url: '', legenda: '' } }];\n}\nvar doc = best.doc;\nreturn [{ json: { texto: 'Enviando: ' + doc.title, arquivo_url: doc.file_url, legenda: doc.title } }];",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "tem-arquivo",
+      "name": "TEM ARQUIVO?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.arquivo_url }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "baixar-arquivo",
+      "name": "BAIXAR ARQUIVO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        -100
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.arquivo_url }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        },
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "id": "enviar-arquivo",
+      "name": "ENVIAR ARQUIVO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        -100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.chatwoot_account_id }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            },
+            {
+              "name": "content",
+              "value": "={{ $('PROCESSAR').item.json.legenda }}"
+            },
+            {
+              "name": "attachments[]",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "retornar-doc",
+      "name": "RETORNAR",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1540,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resultado",
+              "name": "resultado",
+              "value": "={{ $('PROCESSAR').item.json.texto }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "GATILHO": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR BUSCA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR BUSCA": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR DOCUMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR DOCUMENTO": {
+      "main": [
+        [
+          {
+            "node": "PROCESSAR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PROCESSAR": {
+      "main": [
+        [
+          {
+            "node": "TEM ARQUIVO?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEM ARQUIVO?": {
+      "main": [
+        [
+          {
+            "node": "BAIXAR ARQUIVO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RETORNAR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BAIXAR ARQUIVO": {
+      "main": [
+        [
+          {
+            "node": "ENVIAR ARQUIVO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ENVIAR ARQUIVO": {
+      "main": [
+        [
+          {
+            "node": "RETORNAR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

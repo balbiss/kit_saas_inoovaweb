@@ -1,0 +1,213 @@
+{
+  "id": "MghfSCv0RHweLeOu",
+  "name": "CALENDARIO - CALLBACK",
+  "nodes": [
+    {
+      "id": "87fd50df-e509-4891-810a-29fd195e88d5",
+      "name": "CALLBACK GOOGLE",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "calendario-callback",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "e1e5be99-16eb-4ec5-9d8e-6aedc8d41043"
+    },
+    {
+      "id": "069b5d40-7e7b-4796-ad06-a552c5169218",
+      "name": "TROCAR CODIGO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://oauth2.googleapis.com/token",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "code",
+              "value": "={{ $json.query.code }}"
+            },
+            {
+              "name": "client_id",
+              "value": "{{ $env.GOOGLE_CLIENT_ID }}"
+            },
+            {
+              "name": "client_secret",
+              "value": "{{ $env.GOOGLE_CLIENT_SECRET }}"
+            },
+            {
+              "name": "redirect_uri",
+              "value": "{{ $env.N8N_URL }}/webhook/calendario-callback"
+            },
+            {
+              "name": "grant_type",
+              "value": "authorization_code"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "320c71db-67a0-43a4-bc02-0058e326e1d0",
+      "name": "SALVAR TOKENS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "{{ $env.SUPABASE_URL }}/functions/v1/save-calendar-token",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxYmVqdmh1YXZ6amVrem5vdWFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2ODY1NDMsImV4cCI6MjEwMDI2MjU0M30.VyulYtfVCpldH4OV8uDebVQumHcLmPJzFUENUpMzDoE"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HcfnrNOxcvDi7h8H",
+          "name": "chatwoot_db"
+        }
+      }
+    },
+    {
+      "id": "2ebb7b90-1b8d-4182-b813-80287edb598e",
+      "name": "PAGINA SUCESSO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "jsCode": "var html = '<!DOCTYPE html><html lang=\"pt-BR\"><head><meta charset=\"UTF-8\"><title>Conectado!</title><style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f0f4f8;margin:0}.card{background:white;border-radius:16px;padding:40px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.1);max-width:400px;width:90%}.icon{font-size:56px;margin-bottom:16px}.title{font-size:22px;font-weight:700;color:#065f46;margin-bottom:8px}.desc{color:#64748b;font-size:14px}</style></head><body><div class=\"card\"><div class=\"icon\">&#x2705;</div><div class=\"title\">Google Calendar conectado!</div><div class=\"desc\">O assistente de IA agora pode agendar compromissos automaticamente no seu Google Calendar.</div></div></body></html>'; return [{ json: { html: html } }];"
+      }
+    },
+    {
+      "id": "f7959430-495d-45b8-9536-7b76202c0562",
+      "name": "SERVIR SUCESSO",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "82292f0f-46f4-42dd-b6a4-43809265f44f",
+      "name": "PREPARAR SQL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "jsCode": "var state = $('CALLBACK GOOGLE').item.json.query.state; var refresh_token = $json.refresh_token; return [{ json: { company_id: state, refresh_token: refresh_token } }];"
+      }
+    }
+  ],
+  "connections": {
+    "CALLBACK GOOGLE": {
+      "main": [
+        [
+          {
+            "node": "TROCAR CODIGO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SALVAR TOKENS": {
+      "main": [
+        [
+          {
+            "node": "PAGINA SUCESSO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PAGINA SUCESSO": {
+      "main": [
+        [
+          {
+            "node": "SERVIR SUCESSO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TROCAR CODIGO": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR SQL": {
+      "main": [
+        [
+          {
+            "node": "SALVAR TOKENS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}

@@ -1,0 +1,1370 @@
+{
+  "id": "YyngOMIBrPIavSTo",
+  "name": "PAGAMENTOS - WEBHOOK MERCADO PAGO",
+  "nodes": [
+    {
+      "id": "webhook-mp",
+      "name": "GATILHO WEBHOOK",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pagamentos-mercadopago",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "webhookId": "pagamentos-mercadopago-webhook"
+    },
+    {
+      "id": "buscar-pedido-mp",
+      "name": "BUSCAR PEDIDO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/pedidos?select=*,products(name,tipo,arquivo_digital_url,estoque),companies(chatwoot_account_id,mercadopago_access_token)&id=eq.{{ $json.query.pedido_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ja-processado",
+      "name": "JA PROCESSADO?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "pendente",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "verificar-pagamento-mp",
+      "name": "VERIFICAR PAGAMENTO MP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        -100
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.mercadopago.com/v1/payments/{{ $json.mercadopago_payment_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $json.companies.mercadopago_access_token }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "aprovado",
+      "name": "APROVADO?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        -100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "approved",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "marcar-pago",
+      "name": "MARCAR PAGO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        -180
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/pedidos?id=eq.{{ $('BUSCAR PEDIDO').item.json.id }}&status=eq.pendente",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'pago' }) }}",
+        "options": {}
+      },
+      "alwaysOutputData": false
+    },
+    {
+      "id": "decrementar-estoque",
+      "name": "DECREMENTAR ESTOQUE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        -180
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/rpc/decrementar_estoque",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_product_id: $('BUSCAR PEDIDO').item.json.product_id }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "marcar-label-pago",
+      "name": "MARCAR LABEL PAGO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        -180
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.CHATWOOT_URL }}/api/v1/accounts/{{ $('BUSCAR PEDIDO').item.json.companies.chatwoot_account_id }}/conversations/{{ $('BUSCAR PEDIDO').item.json.conversation_id }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "{{ $env.CHATWOOT_AGENCY_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "preparar-label-pago",
+      "name": "PREPARAR LABEL PAGO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        -180
+      ],
+      "parameters": {
+        "jsCode": "var labels = $json.payload || [];\nif (labels.indexOf('pago') === -1) { labels.push('pago'); }\nreturn [{ json: { body: JSON.stringify({ labels: labels }) } }];"
+      }
+    },
+    {
+      "id": "definir-label-pago",
+      "name": "DEFINIR LABEL PAGO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        -180
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_URL }}/api/v1/accounts/{{ $('BUSCAR PEDIDO').item.json.companies.chatwoot_account_id }}/conversations/{{ $('BUSCAR PEDIDO').item.json.conversation_id }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "{{ $env.CHATWOOT_AGENCY_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "tipo-digital",
+      "name": "TIPO DIGITAL?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2200,
+        -180
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('BUSCAR PEDIDO').item.json.products.tipo }}",
+              "rightValue": "digital",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "baixar-arquivo-digital",
+      "name": "BAIXAR ARQUIVO DIGITAL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2420,
+        -260
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('BUSCAR PEDIDO').item.json.products.arquivo_digital_url }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        },
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "id": "enviar-arquivo-digital",
+      "name": "ENVIAR ARQUIVO DIGITAL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        -260
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_URL }}/api/v1/accounts/{{ $('BUSCAR PEDIDO').item.json.companies.chatwoot_account_id }}/conversations/{{ $('BUSCAR PEDIDO').item.json.conversation_id }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "{{ $env.CHATWOOT_AGENCY_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            },
+            {
+              "name": "content",
+              "value": "=Pagamento confirmado! Aqui esta o seu produto: \"{{ $('BUSCAR PEDIDO').item.json.products.name }}\". Obrigado pela compra!"
+            },
+            {
+              "name": "attachments[]",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "enviar-confirmacao-fisico",
+      "name": "ENVIAR CONFIRMACAO FISICO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2420,
+        -100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_URL }}/api/v1/accounts/{{ $('BUSCAR PEDIDO').item.json.companies.chatwoot_account_id }}/conversations/{{ $('BUSCAR PEDIDO').item.json.conversation_id }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "{{ $env.CHATWOOT_AGENCY_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: 'Pagamento confirmado! Recebemos seu pedido de \"' + $('BUSCAR PEDIDO').item.json.products.name + '\". Nossa equipe ja foi avisada e vai providenciar a entrega.', message_type: 'outgoing', private: false }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "atribuir-time-vendas",
+      "name": "ATRIBUIR TIME VENDAS",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2640,
+        -100
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "SRQKihi0GaDxpZhN",
+          "mode": "id",
+          "cachedResultName": "ATENDIMENTO - TRANSFERIR HUMANO"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id_conta": "={{ $('BUSCAR PEDIDO').item.json.companies.chatwoot_account_id }}",
+            "id_conversa": "={{ Number($('BUSCAR PEDIDO').item.json.conversation_id) }}",
+            "url_chatwoot": "{{ $env.CHATWOOT_URL }}",
+            "token": "{{ $env.CHATWOOT_AGENCY_TOKEN }}",
+            "departamento": "vendas",
+            "company_id": "={{ $('BUSCAR PEDIDO').item.json.company_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "id_conta",
+              "displayName": "id_conta",
+              "type": "number"
+            },
+            {
+              "id": "id_conversa",
+              "displayName": "id_conversa",
+              "type": "number"
+            },
+            {
+              "id": "url_chatwoot",
+              "displayName": "url_chatwoot",
+              "type": "string"
+            },
+            {
+              "id": "token",
+              "displayName": "token",
+              "type": "string"
+            },
+            {
+              "id": "departamento",
+              "displayName": "departamento",
+              "type": "string"
+            },
+            {
+              "id": "company_id",
+              "displayName": "company_id",
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      }
+    },
+    {
+      "id": "agendador-lembrete-pix",
+      "name": "AGENDADOR LEMBRETE PIX",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "buscar-pedidos-expirados",
+      "name": "BUSCAR PEDIDOS EXPIRADOS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        300
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/pedidos?select=*,products(name),companies(chatwoot_account_id)&status=eq.pendente&lembrete_enviado=eq.false&expira_em=lt.{{ $now.toISO() }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "enviar-lembrete-pix",
+      "name": "ENVIAR LEMBRETE PIX",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ '{{ $env.CHATWOOT_URL }}/api/v1/accounts/' + $json.companies.chatwoot_account_id + '/conversations/' + $json.conversation_id + '/messages' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "{{ $env.CHATWOOT_AGENCY_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: 'Vimos que o Pix de R$ ' + Number($json.valor).toFixed(2).replace('.', ',') + ' (' + $json.products.name + ') ainda nao foi confirmado. Ainda tem interesse na compra? Se sim, e so me avisar que eu gero um novo Pix pra voce.', message_type: 'outgoing', private: false }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "marcar-lembrete-enviado",
+      "name": "MARCAR LEMBRETE ENVIADO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/pedidos?id=eq.{{ $json.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lembrete_enviado: true }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "tipo-agendamento-if",
+      "name": "TIPO AGENDAMENTO?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        220,
+        -220
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.query.tipo }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "agendamento"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "buscar-agendamento-pagamento-webhook",
+      "name": "BUSCAR AGENDAMENTO PAGAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        440,
+        -220
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/agendamento_pagamentos?select=*,resources(name,calendar_id),companies(chatwoot_account_id,mercadopago_access_token)&id=eq.{{ $json.query.agendamento_pagamento_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ja-processado-agendamento-if",
+      "name": "JA PROCESSADO? (AGENDAMENTO)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        -220
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "pendente"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "verificar-pagamento-mp-agendamento",
+      "name": "VERIFICAR PAGAMENTO MP (AGENDAMENTO)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        880,
+        -220
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.mercadopago.com/v1/payments/{{ $json.mercadopago_payment_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $json.companies.mercadopago_access_token }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "aprovado-agendamento-if",
+      "name": "APROVADO? (AGENDAMENTO)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        -220
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "approved"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "marcar-pago-agendamento",
+      "name": "MARCAR PAGO (AGENDAMENTO)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1320,
+        -220
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/agendamento_pagamentos?id=eq.{{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.id }}&status=eq.pendente",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'pago' }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "chamar-calendario-agendar-webhook",
+      "name": "CHAMAR CALENDARIO - AGENDAR",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1540,
+        -220
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "cgJqoXaDZZhzPu2y",
+          "mode": "id",
+          "cachedResultName": "CALENDARIO - AGENDAR"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "titulo": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.titulo }}",
+            "data_hora_inicio": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.data_hora_inicio }}",
+            "descricao": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.descricao }}",
+            "nome_lead": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.nome_lead }}",
+            "telefone": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.telefone }}",
+            "termo_contato": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.termo_contato }}",
+            "id_conversa": "={{ Number($('BUSCAR AGENDAMENTO PAGAMENTO').item.json.conversation_id) }}",
+            "url_chatwoot": "{{ $env.CHATWOOT_URL }}",
+            "token": "{{ $env.CHATWOOT_AGENCY_TOKEN }}",
+            "company_id": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.company_id }}",
+            "chatwoot_account_id": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.companies.chatwoot_account_id }}",
+            "resource_nome": "",
+            "prompt_nicho": "",
+            "pagamento_confirmado": true,
+            "resource_id_direto": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.resource_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "titulo",
+              "displayName": "titulo",
+              "type": "string"
+            },
+            {
+              "id": "data_hora_inicio",
+              "displayName": "data_hora_inicio",
+              "type": "string"
+            },
+            {
+              "id": "descricao",
+              "displayName": "descricao",
+              "type": "string"
+            },
+            {
+              "id": "nome_lead",
+              "displayName": "nome_lead",
+              "type": "string"
+            },
+            {
+              "id": "telefone",
+              "displayName": "telefone",
+              "type": "string"
+            },
+            {
+              "id": "termo_contato",
+              "displayName": "termo_contato",
+              "type": "string"
+            },
+            {
+              "id": "id_conversa",
+              "displayName": "id_conversa",
+              "type": "number"
+            },
+            {
+              "id": "url_chatwoot",
+              "displayName": "url_chatwoot",
+              "type": "string"
+            },
+            {
+              "id": "token",
+              "displayName": "token",
+              "type": "string"
+            },
+            {
+              "id": "company_id",
+              "displayName": "company_id",
+              "type": "string"
+            },
+            {
+              "id": "chatwoot_account_id",
+              "displayName": "chatwoot_account_id",
+              "type": "number"
+            },
+            {
+              "id": "resource_nome",
+              "displayName": "resource_nome",
+              "type": "string"
+            },
+            {
+              "id": "prompt_nicho",
+              "displayName": "prompt_nicho",
+              "type": "string"
+            },
+            {
+              "id": "pagamento_confirmado",
+              "displayName": "pagamento_confirmado",
+              "type": "boolean"
+            },
+            {
+              "id": "resource_id_direto",
+              "displayName": "resource_id_direto",
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "enviar-confirmacao-agendamento",
+      "name": "ENVIAR CONFIRMACAO AGENDAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1760,
+        -220
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ '{{ $env.CHATWOOT_URL }}/api/v1/accounts/' + $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.companies.chatwoot_account_id + '/conversations/' + $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.conversation_id + '/messages' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "{{ $env.CHATWOOT_AGENCY_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: 'Pagamento confirmado! ' + $json.confirmacao + ($('BUSCAR AGENDAMENTO PAGAMENTO').item.json.tipo_cobranca === 'sinal' ? ' O restante e combinado direto com voce no dia.' : ''), message_type: 'outgoing', private: false }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "buscar-labels-agenda-confirmado",
+      "name": "BUSCAR LABELS AGENDA CONFIRMADO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1980,
+        -220
+      ],
+      "parameters": {
+        "url": "={{ '{{ $env.CHATWOOT_URL }}/api/v1/accounts/' + $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.companies.chatwoot_account_id + '/conversations/' + $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.conversation_id + '/labels' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "{{ $env.CHATWOOT_AGENCY_TOKEN }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "definir-label-agenda-confirmado",
+      "name": "DEFINIR LABEL AGENDA CONFIRMADO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2200,
+        -220
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ '{{ $env.CHATWOOT_URL }}/api/v1/accounts/' + $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.companies.chatwoot_account_id + '/conversations/' + $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.conversation_id + '/labels' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "{{ $env.CHATWOOT_AGENCY_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ labels: Array.from(new Set([...(($json.payload) || []).filter(l => l !== 'aguardando_pagamento'), 'agendado'])) }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "buscar-agendamentos-pagamento-expirados",
+      "name": "BUSCAR AGENDAMENTOS PAGAMENTO EXPIRADOS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        220,
+        460
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/agendamento_pagamentos?select=*,resources(name),companies(chatwoot_account_id)&status=eq.pendente&lembrete_enviado=eq.false&expira_em=lt.{{ $now.toISO() }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "enviar-lembrete-pix-agendamento",
+      "name": "ENVIAR LEMBRETE PIX AGENDAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        440,
+        460
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ '{{ $env.CHATWOOT_URL }}/api/v1/accounts/' + $json.companies.chatwoot_account_id + '/conversations/' + $json.conversation_id + '/messages' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "{{ $env.CHATWOOT_AGENCY_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: 'Vimos que o ' + ($json.tipo_cobranca === 'integral' ? ('Pix de R$ ' + Number($json.valor).toFixed(2).replace('.', ',')) : ('Pix do sinal de R$ ' + Number($json.valor).toFixed(2).replace('.', ','))) + ' pra confirmar seu horario ainda nao foi pago. Ainda tem interesse em agendar? Se sim, e so me avisar que eu gero um novo Pix pra voce.', message_type: 'outgoing', private: false }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "marcar-lembrete-enviado-agendamento",
+      "name": "MARCAR LEMBRETE ENVIADO AGENDAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        660,
+        460
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/agendamento_pagamentos?id=eq.{{ $json.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lembrete_enviado: true }) }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "GATILHO WEBHOOK": {
+      "main": [
+        [
+          {
+            "node": "TIPO AGENDAMENTO?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR PEDIDO": {
+      "main": [
+        [
+          {
+            "node": "JA PROCESSADO?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JA PROCESSADO?": {
+      "main": [
+        [
+          {
+            "node": "VERIFICAR PAGAMENTO MP",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "VERIFICAR PAGAMENTO MP": {
+      "main": [
+        [
+          {
+            "node": "APROVADO?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "APROVADO?": {
+      "main": [
+        [
+          {
+            "node": "MARCAR PAGO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "MARCAR PAGO": {
+      "main": [
+        [
+          {
+            "node": "DECREMENTAR ESTOQUE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DECREMENTAR ESTOQUE": {
+      "main": [
+        [
+          {
+            "node": "MARCAR LABEL PAGO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MARCAR LABEL PAGO": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR LABEL PAGO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR LABEL PAGO": {
+      "main": [
+        [
+          {
+            "node": "DEFINIR LABEL PAGO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DEFINIR LABEL PAGO": {
+      "main": [
+        [
+          {
+            "node": "TIPO DIGITAL?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TIPO DIGITAL?": {
+      "main": [
+        [
+          {
+            "node": "BAIXAR ARQUIVO DIGITAL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ENVIAR CONFIRMACAO FISICO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BAIXAR ARQUIVO DIGITAL": {
+      "main": [
+        [
+          {
+            "node": "ENVIAR ARQUIVO DIGITAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ENVIAR CONFIRMACAO FISICO": {
+      "main": [
+        [
+          {
+            "node": "ATRIBUIR TIME VENDAS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AGENDADOR LEMBRETE PIX": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR PEDIDOS EXPIRADOS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "BUSCAR AGENDAMENTOS PAGAMENTO EXPIRADOS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR PEDIDOS EXPIRADOS": {
+      "main": [
+        [
+          {
+            "node": "ENVIAR LEMBRETE PIX",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ENVIAR LEMBRETE PIX": {
+      "main": [
+        [
+          {
+            "node": "MARCAR LEMBRETE ENVIADO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TIPO AGENDAMENTO?": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR AGENDAMENTO PAGAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "BUSCAR PEDIDO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR AGENDAMENTO PAGAMENTO": {
+      "main": [
+        [
+          {
+            "node": "JA PROCESSADO? (AGENDAMENTO)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JA PROCESSADO? (AGENDAMENTO)": {
+      "main": [
+        [
+          {
+            "node": "VERIFICAR PAGAMENTO MP (AGENDAMENTO)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VERIFICAR PAGAMENTO MP (AGENDAMENTO)": {
+      "main": [
+        [
+          {
+            "node": "APROVADO? (AGENDAMENTO)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "APROVADO? (AGENDAMENTO)": {
+      "main": [
+        [
+          {
+            "node": "MARCAR PAGO (AGENDAMENTO)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MARCAR PAGO (AGENDAMENTO)": {
+      "main": [
+        [
+          {
+            "node": "CHAMAR CALENDARIO - AGENDAR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CHAMAR CALENDARIO - AGENDAR": {
+      "main": [
+        [
+          {
+            "node": "ENVIAR CONFIRMACAO AGENDAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ENVIAR CONFIRMACAO AGENDAMENTO": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR LABELS AGENDA CONFIRMADO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR LABELS AGENDA CONFIRMADO": {
+      "main": [
+        [
+          {
+            "node": "DEFINIR LABEL AGENDA CONFIRMADO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR AGENDAMENTOS PAGAMENTO EXPIRADOS": {
+      "main": [
+        [
+          {
+            "node": "ENVIAR LEMBRETE PIX AGENDAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ENVIAR LEMBRETE PIX AGENDAMENTO": {
+      "main": [
+        [
+          {
+            "node": "MARCAR LEMBRETE ENVIADO AGENDAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

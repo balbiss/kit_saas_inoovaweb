@@ -1,0 +1,306 @@
+{
+  "id": "sol30qBTST7TfrZl",
+  "name": "LEMBRETE - GERAR E ENVIAR",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "agendamento_id"
+            },
+            {
+              "name": "id_conta",
+              "type": "number"
+            },
+            {
+              "name": "id_conversa",
+              "type": "number"
+            },
+            {
+              "name": "data_hora"
+            },
+            {
+              "name": "titulo"
+            },
+            {
+              "name": "prompt_nicho"
+            },
+            {
+              "name": "url_chatwoot"
+            },
+            {
+              "name": "token_chatwoot"
+            }
+          ]
+        }
+      },
+      "id": "37bebb0b-5b5a-4320-997d-b2cb38ea47f1",
+      "name": "GATILHO",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Gere a mensagem de lembrete de confirmacao para o compromisso: \"{{ $json.titulo }}\", agendado para {{ $json.data_hora }}.",
+        "options": {
+          "systemMessage": "=Voce e assistente de atendimento. Contexto do negocio:\n{{ $json.prompt_nicho }}\n\nGere APENAS a mensagem de WhatsApp de lembrete perguntando se o contato confirma o compromisso ou precisa remarcar. Seja breve (maximo 3 linhas), natural e profissional. Nao adicione prefixo ou explicacoes extras."
+        }
+      },
+      "id": "f87e0a9d-f2bc-49e2-b794-e98ee179e6b4",
+      "name": "GERAR LEMBRETE",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        224,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "92dd485f-191e-45f1-91d0-d85650898cde",
+      "name": "OpenAI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        176,
+        320
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "ftEz13q7mPv07CxS",
+          "name": "GUILHERME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.id_conta }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token_chatwoot }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $json.output, message_type: 'outgoing', private: false }) }}",
+        "options": {}
+      },
+      "id": "261efa53-1fee-4ed1-a55a-8e7b73ea3967",
+      "name": "ENVIAR MENSAGEM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        576,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.id_conta }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token_chatwoot }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "44f24758-e707-4826-be2f-82c3820b51e1",
+      "name": "BUSCAR LABELS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        800,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "var labels = $json.payload || []; if (labels.indexOf('aguardando_confirmacao') === -1) { labels.push('aguardando_confirmacao'); } return [{ json: { labels: labels, body: JSON.stringify({ labels: labels }) } }];"
+      },
+      "id": "a921bd25-eeff-4623-92e5-4262ab890298",
+      "name": "PREPARAR LABELS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.id_conta }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token_chatwoot }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {}
+      },
+      "id": "2d01a32b-e5eb-4a72-94c2-5cc5d406d9bd",
+      "name": "DEFINIR LABELS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1248,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/appointments?id=eq.{{ $('GATILHO').item.json.agendamento_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'lembrete_enviado' }) }}",
+        "options": {}
+      },
+      "id": "b7876b07-f365-4236-aa92-ebc32fea64f1",
+      "name": "MARCAR ENVIADO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1504,
+        112
+      ]
+    }
+  ],
+  "connections": {
+    "GATILHO": {
+      "main": [
+        [
+          {
+            "node": "GERAR LEMBRETE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GERAR LEMBRETE": {
+      "main": [
+        [
+          {
+            "node": "ENVIAR MENSAGEM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "GERAR LEMBRETE",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ENVIAR MENSAGEM": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR LABELS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR LABELS": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR LABELS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR LABELS": {
+      "main": [
+        [
+          {
+            "node": "DEFINIR LABELS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DEFINIR LABELS": {
+      "main": [
+        [
+          {
+            "node": "MARCAR ENVIADO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  }
+}

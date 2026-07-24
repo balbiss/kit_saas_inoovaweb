@@ -1,0 +1,201 @@
+version: "3.7"
+
+services:
+
+  ## --------------------------- BANCO DE DADOS --------------------------- ##
+
+  chatwoot_db:
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_USER=chatwoot
+      - POSTGRES_PASSWORD=${CHATWOOT_POSTGRES_PASSWORD}
+      - POSTGRES_DB=chatwoot_production
+    volumes:
+      - chatwoot_postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+
+  ## --------------------------- REDIS --------------------------- ##
+
+  chatwoot_redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${CHATWOOT_REDIS_PASSWORD} --appendonly yes
+    volumes:
+      - chatwoot_redis_data:/data
+    networks:
+      - app_network
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  ## --------------------------- WHATSAPP (BAILEYS) --------------------------- ##
+  ## Bridge de WhatsApp via Baileys, imagem publica (nao precisa buildar).
+
+  chatwoot_baileys:
+    image: ghcr.io/fazer-ai/baileys-api:latest
+    command:
+      - sh
+      - "-c"
+      - "bun manage-api-keys create user ${BAILEYS_API_KEY} && bun start"
+    environment:
+      - NODE_ENV=production
+      - PORT=3025
+      - REDIS_URL=redis://:${CHATWOOT_REDIS_PASSWORD}@chatwoot_redis:6379/1
+      - LOG_LEVEL=warn
+      - BAILEYS_LOG_LEVEL=error
+      - BAILEYS_PROVIDER_DEFAULT_API_KEY=${BAILEYS_API_KEY}
+      - IGNORE_GROUP_MESSAGES=true
+      - IGNORE_STATUS_MESSAGES=true
+    volumes:
+      - chatwoot_baileys_storage:/app/storage
+    networks:
+      - app_network
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+  ## --------------------------- WEB (RAILS + FRONTEND EMBUTIDO) --------------------------- ##
+  ## CHATWOOT_IMAGE: builde a partir do repo chatwoot_innovaweb (fork de
+  ## fazer-ai/chatwoot) e publique no SEU proprio registry, ou builde local e
+  ## use so o nome da imagem (sem @sha256, ai o Swarm nao vai puxar de fora).
+
+  chatwoot_web:
+    image: ${CHATWOOT_IMAGE}
+    command: >
+      sh -c "until bundle exec rake db:chatwoot_prepare && bundle exec rails db:migrate; do echo 'Aguardando banco...'; sleep 5; done && bundle exec rake branding:update && bundle exec rails s -p 3000 -b 0.0.0.0"
+    environment:
+      - RAILS_ENV=production
+      - FRONTEND_URL=https://${CHATWOOT_DOMAIN}
+      - INSTALLATION_NAME=${BRAND_NAME}
+      - BRAND_NAME=${BRAND_NAME}
+      - BRAND_COLOR=${BRAND_COLOR}
+      - DISPLAY_MANIFEST=false
+      - SECRET_KEY_BASE=${CHATWOOT_SECRET_KEY_BASE}
+      - POSTGRES_HOST=chatwoot_db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DATABASE=chatwoot_production
+      - POSTGRES_USERNAME=chatwoot
+      - POSTGRES_PASSWORD=${CHATWOOT_POSTGRES_PASSWORD}
+      - REDIS_URL=redis://:${CHATWOOT_REDIS_PASSWORD}@chatwoot_redis:6379/0
+      - RAILS_LOG_TO_STDOUT=true
+      - RAILS_SERVE_STATIC_FILES=true
+      - ENABLE_ACCOUNT_SIGNUP=false
+      - FORCE_SSL=false
+      - TZ=America/Sao_Paulo
+      - ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY=${ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY}
+      - ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY=${ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY}
+      - ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT=${ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT}
+      - BAILEYS_PROVIDER_DEFAULT_URL=http://chatwoot_baileys:3025
+      - BAILEYS_PROVIDER_DEFAULT_API_KEY=${BAILEYS_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MAILER_SENDER_EMAIL=${SMTP_SENDER_EMAIL}
+      - SMTP_ADDRESS=${SMTP_ADDRESS}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_AUTHENTICATION=plain
+      - SMTP_ENABLE_STARTTLS_AUTO=true
+    volumes:
+      - chatwoot_storage:/app/storage
+      - chatwoot_public:/app/public/packs
+    networks:
+      - app_network
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1536M
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.chatwoot_web.rule=Host(`${CHATWOOT_DOMAIN}`)
+        - traefik.http.routers.chatwoot_web.entrypoints=websecure
+        - traefik.http.routers.chatwoot_web.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.chatwoot_web.service=chatwoot_web
+        - traefik.http.services.chatwoot_web.loadbalancer.server.port=3000
+        - traefik.http.services.chatwoot_web.loadbalancer.passHostHeader=1
+        - traefik.http.services.chatwoot_web.loadbalancer.responseForwarding.flushInterval=100ms
+
+  ## --------------------------- SIDEKIQ (WORKER DE BACKGROUND) --------------------------- ##
+
+  chatwoot_sidekiq:
+    image: ${CHATWOOT_IMAGE}
+    command: sh -c "sleep 40 && bundle exec sidekiq -C config/sidekiq.yml"
+    environment:
+      - RAILS_ENV=production
+      - FRONTEND_URL=https://${CHATWOOT_DOMAIN}
+      - SECRET_KEY_BASE=${CHATWOOT_SECRET_KEY_BASE}
+      - POSTGRES_HOST=chatwoot_db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DATABASE=chatwoot_production
+      - POSTGRES_USERNAME=chatwoot
+      - POSTGRES_PASSWORD=${CHATWOOT_POSTGRES_PASSWORD}
+      - REDIS_URL=redis://:${CHATWOOT_REDIS_PASSWORD}@chatwoot_redis:6379/0
+      - ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY=${ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY}
+      - ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY=${ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY}
+      - ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT=${ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT}
+      - BAILEYS_PROVIDER_DEFAULT_URL=http://chatwoot_baileys:3025
+      - BAILEYS_PROVIDER_DEFAULT_API_KEY=${BAILEYS_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - RAILS_LOG_TO_STDOUT=true
+      - TZ=America/Sao_Paulo
+    volumes:
+      - chatwoot_storage:/app/storage
+    networks:
+      - app_network
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+
+## ================================================================
+
+volumes:
+  chatwoot_postgres_data:
+  chatwoot_redis_data:
+  chatwoot_baileys_storage:
+  chatwoot_storage:
+  chatwoot_public:
+
+networks:
+  app_network:
+    external: true
+    name: app_network

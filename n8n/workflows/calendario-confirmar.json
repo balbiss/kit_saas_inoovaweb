@@ -1,0 +1,556 @@
+{
+  "id": "2y1eOO7UDQE7VJmc",
+  "name": "CALENDARIO - CONFIRMAR",
+  "nodes": [
+    {
+      "id": "70c53d97-e07b-45a6-b06e-ea9882685394",
+      "name": "GATILHO",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        192
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "company_id",
+              "type": "string"
+            },
+            {
+              "name": "chatwoot_account_id",
+              "type": "number"
+            },
+            {
+              "name": "id_conversa",
+              "type": "number"
+            },
+            {
+              "name": "url_chatwoot",
+              "type": "string"
+            },
+            {
+              "name": "token",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "64b778d1-6a07-4573-8064-7d5b0be30eba",
+      "name": "BUSCAR AGENDAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        192
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/appointments?select=id,google_event_id,title,resource_id,resources(calendar_id)&company_id=eq.{{ $('GATILHO').item.json.company_id }}&conversation_id=eq.{{ $('GATILHO').item.json.id_conversa }}&status=eq.lembrete_enviado&order=created_at.desc&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "220cb197-1aa5-4cd8-b789-c2c76108d124",
+      "name": "TEM AGENDAMENTO?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        192
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.google_event_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "56a37969-edf9-44e9-9765-6cba9d2f8747",
+      "name": "BUSCAR TOKENS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        96
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/functions/v1/get-calendar-token",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "company_id",
+              "value": "={{ $('GATILHO').item.json.company_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxYmVqdmh1YXZ6amVrem5vdWFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2ODY1NDMsImV4cCI6MjEwMDI2MjU0M30.VyulYtfVCpldH4OV8uDebVQumHcLmPJzFUENUpMzDoE"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "91079656-2255-4aab-8464-2c63fcb9c1c7",
+      "name": "TEM TOKEN?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.refresh_token }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "8314a153-0fc6-4b14-84a3-fe3b92bf201e",
+      "name": "RENOVAR TOKEN",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://oauth2.googleapis.com/token",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "refresh_token",
+              "value": "={{ $json.refresh_token }}"
+            },
+            {
+              "name": "client_id",
+              "value": "{{ $env.GOOGLE_CLIENT_ID }}"
+            },
+            {
+              "name": "client_secret",
+              "value": "{{ $env.GOOGLE_CLIENT_SECRET }}"
+            },
+            {
+              "name": "grant_type",
+              "value": "refresh_token"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "574c2460-9fd8-4cf3-8e4a-16a22ae0e78a",
+      "name": "ATUALIZAR EVENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1568,
+        0
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent(($('BUSCAR AGENDAMENTO').item.json.resources && $('BUSCAR AGENDAMENTO').item.json.resources.calendar_id) || $('BUSCAR TOKENS').item.json.calendar_id || 'primary') }}/events/{{ $('BUSCAR AGENDAMENTO').item.json.google_event_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ summary: '\\u2713 CONFIRMADO - ' + $('BUSCAR AGENDAMENTO').item.json.title }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "445b1a50-bb2f-42f5-8ce3-6811cddec980",
+      "name": "CONFIRMAR DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1792,
+        0
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/appointments?id=eq.{{ $('BUSCAR AGENDAMENTO').item.json.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'confirmado' }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "b1846b97-7120-4d24-af5c-d16e163a43da",
+      "name": "BUSCAR LABELS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2016,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.chatwoot_account_id }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "0f7b92e0-2993-4333-9bf8-eafa353b9463",
+      "name": "PREPARAR LABELS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "var labels = $json.payload || []; labels = labels.filter(function(l) { return l !== 'aguardando_confirmacao'; }); return [{ json: { labels: labels, body: JSON.stringify({ labels: labels }) } }];"
+      }
+    },
+    {
+      "id": "da15be36-d94a-418e-ab65-d011f27aaafe",
+      "name": "REMOVER LABEL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2464,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.chatwoot_account_id }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "cc241931-12be-452f-a582-a770aea8690a",
+      "name": "RETORNAR OK",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2688,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "conf",
+              "name": "confirmacao",
+              "value": "Compromisso confirmado! Atualizei o evento no Google Calendar como CONFIRMADO.",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f653a228-c90c-4663-a320-138f3251d2aa",
+      "name": "SEM CALENDARIO",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1344,
+        192
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "conf",
+              "name": "confirmacao",
+              "value": "Google Calendar nao conectado para esta conta.",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "5982f765-f6fb-4572-a8f3-ce6d403811d2",
+      "name": "SEM AGENDAMENTO",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        288
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "conf",
+              "name": "confirmacao",
+              "value": "Nenhum compromisso pendente de confirmacao encontrado.",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "GATILHO": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR AGENDAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR AGENDAMENTO": {
+      "main": [
+        [
+          {
+            "node": "TEM AGENDAMENTO?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEM AGENDAMENTO?": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR TOKENS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SEM AGENDAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR TOKENS": {
+      "main": [
+        [
+          {
+            "node": "TEM TOKEN?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEM TOKEN?": {
+      "main": [
+        [
+          {
+            "node": "RENOVAR TOKEN",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SEM CALENDARIO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RENOVAR TOKEN": {
+      "main": [
+        [
+          {
+            "node": "ATUALIZAR EVENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ATUALIZAR EVENTO": {
+      "main": [
+        [
+          {
+            "node": "CONFIRMAR DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CONFIRMAR DB": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR LABELS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR LABELS": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR LABELS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR LABELS": {
+      "main": [
+        [
+          {
+            "node": "REMOVER LABEL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "REMOVER LABEL": {
+      "main": [
+        [
+          {
+            "node": "RETORNAR OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}

@@ -1,0 +1,272 @@
+{
+  "id": "CVEpI14AvmM0F5ML",
+  "name": "REENGAJAMENTO - LEAD FRIO",
+  "nodes": [
+    {
+      "id": "gatilho-reeng",
+      "name": "GATILHO",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 10
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "buscar-empresas-reeng",
+      "name": "BUSCAR EMPRESAS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/companies?select=id,chatwoot_account_id,ai_prompt,reengajamento_dias_inativo&reengajamento_enabled=eq.true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "buscar-conversas-reeng",
+      "name": "BUSCAR CONVERSAS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ '{{ $env.CHATWOOT_URL }}/api/v1/accounts/' + $json.chatwoot_account_id + '/conversations?status=open' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "{{ $env.CHATWOOT_AGENCY_TOKEN }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "preparar-conversas-reeng",
+      "name": "PREPARAR CONVERSAS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const empresas = $('BUSCAR EMPRESAS').all().map(function(i){ return i.json; });\nconst conversasResponses = $input.all().map(function(i){ return i.json; });\nconst results = [];\nfor (let idx = 0; idx < conversasResponses.length; idx++) {\n  const company = empresas[idx];\n  const resp = conversasResponses[idx];\n  const conversations = (resp.data && resp.data.payload) || [];\n  const diasInativo = company.reengajamento_dias_inativo ?? 3;\n  const cutoff = Math.floor(Date.now() / 1000) - diasInativo * 86400;\n  const filtered = conversations.filter(function(c) {\n    const labels = c.labels || [];\n    return labels.indexOf('agente_off') === -1 && labels.indexOf('reengajado_frio') === -1 && (c.last_activity_at || 0) < cutoff;\n  });\n  for (const c of filtered) {\n    results.push({ json: {\n      chatwoot_account_id: company.chatwoot_account_id,\n      ai_prompt: company.ai_prompt,\n      conversation_id: c.id,\n      labels: c.labels || [],\n    } });\n  }\n}\nreturn results;"
+      }
+    },
+    {
+      "id": "gerar-mensagem-reeng",
+      "name": "GERAR MENSAGEM",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=Gere uma mensagem curta de reengajamento para um lead que parou de responder ha alguns dias.",
+        "options": {
+          "systemMessage": "=Voce e assistente de atendimento. Contexto do negocio:\n{{ $json.ai_prompt }}\n\nGere APENAS a mensagem de WhatsApp para retomar contato com um lead que sumiu no meio da conversa. Seja breve (maximo 3 linhas), natural, sem soar robotico ou insistente, e pergunte se ainda ha interesse ou se pode ajudar em algo. Nao adicione prefixo ou explicacoes extras."
+        }
+      }
+    },
+    {
+      "id": "openai-model-reeng",
+      "name": "OpenAI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        880,
+        180
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "ftEz13q7mPv07CxS",
+          "name": "GUILHERME"
+        }
+      }
+    },
+    {
+      "id": "enviar-mensagem-reeng",
+      "name": "ENVIAR MENSAGEM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ '{{ $env.CHATWOOT_URL }}/api/v1/accounts/' + $('PREPARAR CONVERSAS').item.json.chatwoot_account_id + '/conversations/' + $('PREPARAR CONVERSAS').item.json.conversation_id + '/messages' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "{{ $env.CHATWOOT_AGENCY_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $json.output, message_type: 'outgoing', private: false }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "marcar-reengajado",
+      "name": "MARCAR REENGAJADO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ '{{ $env.CHATWOOT_URL }}/api/v1/accounts/' + $('PREPARAR CONVERSAS').item.json.chatwoot_account_id + '/conversations/' + $('PREPARAR CONVERSAS').item.json.conversation_id + '/labels' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "{{ $env.CHATWOOT_AGENCY_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ labels: $('PREPARAR CONVERSAS').item.json.labels.concat(['reengajado_frio']) }) }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "GATILHO": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR EMPRESAS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR EMPRESAS": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR CONVERSAS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR CONVERSAS": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR CONVERSAS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR CONVERSAS": {
+      "main": [
+        [
+          {
+            "node": "GERAR MENSAGEM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GERAR MENSAGEM": {
+      "main": [
+        [
+          {
+            "node": "ENVIAR MENSAGEM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "GERAR MENSAGEM",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ENVIAR MENSAGEM": {
+      "main": [
+        [
+          {
+            "node": "MARCAR REENGAJADO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

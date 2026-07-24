@@ -1,0 +1,1302 @@
+{
+  "id": "cgJqoXaDZZhzPu2y",
+  "name": "CALENDARIO - AGENDAR",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "titulo"
+            },
+            {
+              "name": "data_hora_inicio"
+            },
+            {
+              "name": "descricao"
+            },
+            {
+              "name": "nome_lead"
+            },
+            {
+              "name": "telefone"
+            },
+            {
+              "name": "termo_contato"
+            },
+            {
+              "name": "id_conversa",
+              "type": "number"
+            },
+            {
+              "name": "url_chatwoot"
+            },
+            {
+              "name": "token"
+            },
+            {
+              "name": "company_id",
+              "type": "string"
+            },
+            {
+              "name": "chatwoot_account_id",
+              "type": "number"
+            },
+            {
+              "name": "resource_nome",
+              "type": "string"
+            },
+            {
+              "name": "prompt_nicho"
+            },
+            {
+              "name": "pagamento_confirmado",
+              "type": "boolean"
+            },
+            {
+              "name": "resource_id_direto",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "600f84a4-b8bd-42d6-aa19-845947c57362",
+      "name": "GATILHO",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/functions/v1/get-calendar-token",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "company_id",
+              "value": "={{ $('GATILHO').item.json.company_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxYmVqdmh1YXZ6amVrem5vdWFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2ODY1NDMsImV4cCI6MjEwMDI2MjU0M30.VyulYtfVCpldH4OV8uDebVQumHcLmPJzFUENUpMzDoE"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "667352b8-d439-44b7-9e87-1ddd93000c34",
+      "name": "BUSCAR TOKENS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('CHECAR BLOQUEIO').item.json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "36212518-9fc8-43e3-a805-7a0fc7921728",
+      "name": "TEM TOKEN?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://oauth2.googleapis.com/token",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "refresh_token",
+              "value": "={{ $('VALIDAR').item.json.refresh_token }}"
+            },
+            {
+              "name": "client_id",
+              "value": "{{ $env.GOOGLE_CLIENT_ID }}"
+            },
+            {
+              "name": "client_secret",
+              "value": "{{ $env.GOOGLE_CLIENT_SECRET }}"
+            },
+            {
+              "name": "grant_type",
+              "value": "refresh_token"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "485d7737-d012-4076-804d-b70322d317d2",
+      "name": "RENOVAR TOKEN",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        720,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "var g = $('GATILHO').item.json; var v = $('VALIDAR').item.json; var access_token = $json.access_token; var duracao = parseInt(v.duracao_minutos) || 60; var inicio = g.data_hora_inicio.includes('+') || g.data_hora_inicio.includes('Z') ? g.data_hora_inicio : g.data_hora_inicio + '-03:00'; var dInicio = new Date(inicio); var dFim = new Date(dInicio.getTime() + duracao * 60000); var fim = dFim.toISOString().replace('Z', '-03:00'); var telefone = g.telefone || ''; var termo = g.termo_contato || 'Cliente'; var descParts = [termo + ': ' + g.nome_lead]; if (telefone) descParts.push('WhatsApp: ' + telefone); if (g.descricao) descParts.push(g.descricao); return [{ json: { access_token: access_token, calendar_id: v.calendar_id || 'primary', evento: { summary: g.titulo, description: descParts.join('\\n'), start: { dateTime: inicio, timeZone: 'America/Sao_Paulo' }, end: { dateTime: fim, timeZone: 'America/Sao_Paulo' } } } }];"
+      },
+      "id": "e56aec70-efc5-4833-8638-6d9ada42c0ee",
+      "name": "PREPARAR EVENTO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($json.calendar_id) }}/events",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.evento) }}",
+        "options": {}
+      },
+      "id": "5f709380-ba3f-4eca-a70b-c92b985e28f6",
+      "name": "CRIAR EVENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1200,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "confirmacao",
+              "name": "confirmacao",
+              "value": "=Agendado! {{ $('GATILHO').item.json.titulo }} em {{ $('GATILHO').item.json.data_hora_inicio }}.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ddca74d3-e665-46c7-aeb5-08ac4c095f13",
+      "name": "RETORNAR OK",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1440,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "confirmacao",
+              "name": "confirmacao",
+              "value": "={{ $('CHECAR BLOQUEIO').item.json.motivo }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9b1c66d9-5dde-49fc-8262-170a98635fa3",
+      "name": "SEM CALENDARIO",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        960,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/resources?select=id,name,calendar_id,exige_pagamento,valor_sinal,tipo_cobranca,agenda_config(duracao_minutos)&company_id=eq.{{ $('GATILHO').item.json.company_id }}&active=eq.true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "buscar-config-agenda-node",
+      "name": "BUSCAR CONFIG AGENDA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        128
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.chatwoot_account_id }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "4b7ca008-6fa6-4c15-bb46-ef9348ea5354",
+      "name": "BUSCAR ETIQUETAS ATUAIS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1440,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "var labels = $json.payload || []; if (labels.indexOf('agendado') === -1) { labels.push('agendado'); } return [{ json: { labels: labels, body: JSON.stringify({ labels: labels }) } }];"
+      },
+      "id": "1f3b7928-9239-4e23-a82c-bb99eeed6078",
+      "name": "PREPARAR ETIQUETAS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.chatwoot_account_id }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {}
+      },
+      "id": "b61031bb-0596-45f6-a50d-eedb5525da86",
+      "name": "DEFINIR ETIQUETA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1920,
+        -128
+      ]
+    },
+    {
+      "id": "7791e1de-bbf1-4ee3-a3f4-e30e963c7352",
+      "name": "PREPARAR SALVAR",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        -128
+      ],
+      "parameters": {
+        "jsCode": "var g = $('GATILHO').item.json; var ev = $('CRIAR EVENTO').item.json; var v = $('VALIDAR').item.json; return [{ json: { company_id: g.company_id, resource_id: v.resource_id || null, conversation_id: g.id_conversa ? String(g.id_conversa) : null, contact_phone: g.telefone || null, title: g.titulo || null, scheduled_at: ev.start.dateTime, google_event_id: ev.id, google_event_link: ev.htmlLink || '', status: 'agendado' } }];"
+      }
+    },
+    {
+      "id": "feea7d75-1541-40ad-b86b-b4e5fba6d12b",
+      "name": "SALVAR AGENDAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        -128
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/appointments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "validar-agendar-node",
+      "name": "VALIDAR",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "jsCode": "\nfunction normalizeWords(s) {\n  var n = (s || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase();\n  n = n.replace(/[^a-z0-9]+/g, ' ').trim();\n  return n.length ? n.split(/\\s+/).filter(function(w){ return w.length >= 2; }) : [];\n}\nfunction pickResource(resources, resourceNome) {\n  if (resources.length === 0) return { match: null, ambiguous: false, empty: true };\n  if (resources.length === 1) return { match: resources[0], ambiguous: false, empty: false };\n  if (!resourceNome) return { match: null, ambiguous: true, empty: false };\n  var searchWords = normalizeWords(resourceNome);\n  var scored = resources.map(function(r) {\n    var nameWords = normalizeWords(r.name);\n    var overlap = searchWords.filter(function(w){ return nameWords.indexOf(w) !== -1; }).length;\n    return { r: r, overlap: overlap };\n  });\n  var maxOverlap = Math.max.apply(null, scored.map(function(s){ return s.overlap; }));\n  var best = scored.filter(function(s){ return s.overlap === maxOverlap; });\n  if (maxOverlap > 0 && best.length === 1) return { match: best[0].r, ambiguous: false, empty: false };\n  return { match: null, ambiguous: true, empty: false };\n}\nvar g = $('GATILHO').item.json; var resources = $('BUSCAR CONFIG AGENDA').all().map(function(i) { return i.json; }); var tk = $('BUSCAR TOKENS').item.json; var pick = g.resource_id_direto ? (function(){ var d = resources.find(function(r){ return r.id === g.resource_id_direto; }); return d ? { match: d, ambiguous: false, empty: false } : { match: null, ambiguous: false, empty: true }; })() : pickResource(resources, g.resource_nome); if (pick.empty) { return [{ json: { ok: false, motivo: 'Nenhum profissional/agenda configurado para esta empresa.', refresh_token: '', calendar_id: '', duracao_minutos: 60, resource_id: '' } }]; } if (pick.ambiguous) { var ids = resources.map(function(r){ return r.name; }).join(', '); return [{ json: { ok: false, motivo: 'Nao consegui identificar com certeza qual profissional/especialista o cliente quer. Pergunte ao cliente qual deles e informe o nome exato em resource_nome. Opcoes: ' + ids + '.', refresh_token: '', calendar_id: '', duracao_minutos: 60, resource_id: '' } }]; } var res = pick.match; var cfg = res.agenda_config || {}; var refreshToken = tk.refresh_token || ''; if (!refreshToken) { return [{ json: { ok: false, motivo: 'Google Calendar nao conectado para esta conta.', refresh_token: '', calendar_id: '', duracao_minutos: 60, resource_id: res.id } }]; } return [{ json: { ok: true, motivo: '', refresh_token: refreshToken, calendar_id: res.calendar_id || tk.calendar_id || 'primary', duracao_minutos: parseInt(cfg.duracao_minutos) || 60, resource_id: res.id, exige_pagamento: !!res.exige_pagamento, valor_sinal: res.valor_sinal, tipo_cobranca: res.tipo_cobranca } }];"
+      }
+    },
+    {
+      "id": "buscar-bloqueios-agendar",
+      "name": "BUSCAR BLOQUEIOS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        0
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/agenda_bloqueios?select=resource_id,periodo,motivo&company_id=eq.{{ $('GATILHO').item.json.company_id }}&data=eq.{{ $('GATILHO').item.json.data_hora_inicio.slice(0,10) }}&or=(resource_id.is.null,resource_id.eq.{{ $('VALIDAR').item.json.resource_id }})",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "checar-bloqueio-agendar",
+      "name": "CHECAR BLOQUEIO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const v = $('VALIDAR').item.json;\nif (!v.ok) { return [{ json: v }]; }\nconst bloqueios = $json || [];\nconst dataHora = $('GATILHO').item.json.data_hora_inicio || '';\nconst hh = parseInt((dataHora.split('T')[1] || '00:00').split(':')[0], 10);\nfunction periodoBate(periodo) {\n  if (periodo === 'dia_todo') return true;\n  if (periodo === 'manha') return hh < 12;\n  if (periodo === 'tarde') return hh >= 12 && hh < 18;\n  if (periodo === 'noite') return hh >= 18;\n  return false;\n}\nconst bloqueado = bloqueios.find(function(b) { return periodoBate(b.periodo); });\nif (bloqueado) {\n  const motivo = 'Agenda bloqueada nesse periodo' + (bloqueado.motivo ? ' (' + bloqueado.motivo + ')' : '') + '.';\n  return [{ json: Object.assign({}, v, { ok: false, motivo: motivo }) }];\n}\nreturn [{ json: v }];"
+      }
+    },
+    {
+      "id": "precisa-pagamento-if",
+      "name": "PRECISA PAGAMENTO?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1520,
+        208
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok === true && $json.exige_pagamento === true && !$('GATILHO').item.json.pagamento_confirmado }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": true
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "buscar-pagamento-pendente-agenda",
+      "name": "BUSCAR PAGAMENTO PENDENTE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1744,
+        620
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/agendamento_pagamentos?select=*&resource_id=eq.{{ $('CHECAR BLOQUEIO').item.json.resource_id }}&conversation_id=eq.{{ $('GATILHO').item.json.id_conversa }}&status=eq.pendente&order=created_at.desc&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "resolver-pagamento-agendamento",
+      "name": "RESOLVER PAGAMENTO AGENDAMENTO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1968,
+        620
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "var pendentes = $('BUSCAR PAGAMENTO PENDENTE').all().map(function(i){ return i.json; }).filter(function(p){ return p && p.id; });\nvar v = $('CHECAR BLOQUEIO').item.json;\nif (pendentes.length > 0) {\n  var pend = pendentes[0];\n  var valorTxt = Number(pend.valor).toFixed(2).replace('.', ',');\n  var rotulo = pend.tipo_cobranca === 'integral' ? 'Pix de R$ ' + valorTxt : 'Pix do sinal de R$ ' + valorTxt;\n  return [{ json: { ja_tem_pendente: true, confirmacao: 'Ja enviei um ' + rotulo + ' aguardando o pagamento pra confirmar esse horario. Assim que for pago, o agendamento e feito automaticamente.' } }];\n}\nreturn [{ json: { ja_tem_pendente: false, resource_id: v.resource_id, valor_sinal: v.valor_sinal, tipo_cobranca: v.tipo_cobranca } }];"
+      }
+    },
+    {
+      "id": "precisa-gerar-pix-agenda-if",
+      "name": "PRECISA GERAR PIX?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2192,
+        620
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ja_tem_pendente }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              },
+              "rightValue": false
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "retornar-aguardando-pagamento-agenda",
+      "name": "RETORNAR AGUARDANDO PAGAMENTO",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2416,
+        500
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "confirmacao",
+              "name": "confirmacao",
+              "type": "string",
+              "value": "={{ $json.confirmacao }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "buscar-config-pagamento-empresa-agenda",
+      "name": "BUSCAR CONFIG PAGAMENTO EMPRESA AGENDA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2416,
+        660
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/companies?select=mercadopago_access_token&id=eq.{{ $('GATILHO').item.json.company_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "mp-configurado-agenda-if",
+      "name": "MP CONFIGURADO?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2640,
+        660
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ !!($json.mercadopago_access_token) }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": true
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "retornar-erro-config-agenda",
+      "name": "RETORNAR ERRO CONFIG PAGAMENTO",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2864,
+        780
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "confirmacao",
+              "name": "confirmacao",
+              "type": "string",
+              "value": "Nao foi possivel gerar a cobranca porque o pagamento automatico ainda nao foi configurado. Avise a empresa."
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "criar-agendamento-pagamento",
+      "name": "CRIAR AGENDAMENTO PAGAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2864,
+        600
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/agendamento_pagamentos",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ company_id: $('GATILHO').item.json.company_id, resource_id: $('RESOLVER PAGAMENTO AGENDAMENTO').item.json.resource_id, titulo: $('GATILHO').item.json.titulo, descricao: $('GATILHO').item.json.descricao, nome_lead: $('GATILHO').item.json.nome_lead, telefone: $('GATILHO').item.json.telefone, termo_contato: $('GATILHO').item.json.termo_contato, data_hora_inicio: $('GATILHO').item.json.data_hora_inicio, conversation_id: String($('GATILHO').item.json.id_conversa), contact_phone: $('GATILHO').item.json.telefone, valor: $('RESOLVER PAGAMENTO AGENDAMENTO').item.json.valor_sinal, status: 'pendente', tipo_cobranca: $('RESOLVER PAGAMENTO AGENDAMENTO').item.json.tipo_cobranca }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "gerar-cobranca-mp-agenda",
+      "name": "GERAR COBRANCA MP AGENDA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3088,
+        600
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mercadopago.com/v1/payments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $('BUSCAR CONFIG PAGAMENTO EMPRESA AGENDA').item.json.mercadopago_access_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Idempotency-Key",
+              "value": "={{ $json.id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ transaction_amount: $json.valor, description: 'Sinal - ' + ($('GATILHO').item.json.titulo || 'Agendamento'), payment_method_id: 'pix', payer: { email: 'cliente' + ($('GATILHO').item.json.telefone || '').replace(/[^0-9]/g, '') + '@example.com' }, external_reference: $json.id, notification_url: '{{ $env.N8N_URL }}/webhook/pagamentos-mercadopago?tipo=agendamento&company_id=' + $('GATILHO').item.json.company_id + '&agendamento_pagamento_id=' + $json.id, date_of_expiration: new Date(Date.now() + 30 * 60000).toISOString() }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "atualizar-agendamento-pagamento",
+      "name": "ATUALIZAR AGENDAMENTO PAGAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3312,
+        600
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/agendamento_pagamentos?id=eq.{{ $('CRIAR AGENDAMENTO PAGAMENTO').item.json.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ mercadopago_payment_id: String($json.id), expira_em: $json.date_of_expiration }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "preparar-qr-agenda",
+      "name": "PREPARAR QR AGENDA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3536,
+        600
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "var mp = $('GERAR COBRANCA MP AGENDA').all()[0].json;\nvar td = (mp.point_of_interaction && mp.point_of_interaction.transaction_data) || {};\nvar qrBase64 = td.qr_code_base64 || '';\nvar qrCode = td.qr_code || '';\nvar valorTxt = Number($('CRIAR AGENDAMENTO PAGAMENTO').item.json.valor).toFixed(2).replace('.', ',');\nvar tipoCobranca = $('CRIAR AGENDAMENTO PAGAMENTO').item.json.tipo_cobranca;\nvar legenda = tipoCobranca === 'integral' ? ('Pix de R$ ' + valorTxt + ' para confirmar seu agendamento.') : ('Pix do sinal de R$ ' + valorTxt + ' para confirmar seu agendamento (o restante e combinado direto no dia).');\nvar out = { json: { legenda: legenda, qr_code: qrCode, valor_txt: valorTxt, tipo_cobranca: tipoCobranca } };\nif (qrBase64) {\n  out.binary = { data: { data: qrBase64, mimeType: 'image/png', fileName: 'pix-agendamento.png' } };\n}\nreturn [out];"
+      }
+    },
+    {
+      "id": "enviar-qr-agenda",
+      "name": "ENVIAR QR AGENDA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3760,
+        600
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot + '/api/v1/accounts/' + $('GATILHO').item.json.chatwoot_account_id + '/conversations/' + $('GATILHO').item.json.id_conversa + '/messages' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "={{ $json.legenda }}"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "attachments[]",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "enviar-codigo-copia-cola-agenda",
+      "name": "ENVIAR CODIGO COPIA COLA AGENDA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3984,
+        600
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot + '/api/v1/accounts/' + $('GATILHO').item.json.chatwoot_account_id + '/conversations/' + $('GATILHO').item.json.id_conversa + '/messages' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $('PREPARAR QR AGENDA').item.json.qr_code, message_type: 'outgoing', private: false }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "buscar-labels-agenda-pagamento",
+      "name": "BUSCAR LABELS AGENDA PAGAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4208,
+        600
+      ],
+      "parameters": {
+        "url": "={{ $('GATILHO').item.json.url_chatwoot + '/api/v1/accounts/' + $('GATILHO').item.json.chatwoot_account_id + '/conversations/' + $('GATILHO').item.json.id_conversa + '/labels' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "definir-label-aguardando-pagamento",
+      "name": "DEFINIR LABEL AGUARDANDO PAGAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4432,
+        600
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot + '/api/v1/accounts/' + $('GATILHO').item.json.chatwoot_account_id + '/conversations/' + $('GATILHO').item.json.id_conversa + '/labels' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ labels: Array.from(new Set([...(($json.payload) || []), 'aguardando_pagamento'])) }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "retornar-pix-gerado-agenda",
+      "name": "RETORNAR PIX GERADO AGENDA",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4656,
+        600
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "confirmacao",
+              "name": "confirmacao",
+              "type": "string",
+              "value": "={{ ($('PREPARAR QR AGENDA').item.json.tipo_cobranca === 'integral' ? ('Pix de R$ ' + $('PREPARAR QR AGENDA').item.json.valor_txt) : ('Pix do sinal de R$ ' + $('PREPARAR QR AGENDA').item.json.valor_txt)) + ' enviado, aguardando o pagamento pra confirmar o agendamento. Assim que o cliente pagar, o horario e confirmado automaticamente.' }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "TEM TOKEN?": {
+      "main": [
+        [
+          {
+            "node": "RENOVAR TOKEN",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SEM CALENDARIO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RENOVAR TOKEN": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR EVENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR EVENTO": {
+      "main": [
+        [
+          {
+            "node": "CRIAR EVENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR TOKENS": {
+      "main": [
+        [
+          {
+            "node": "VALIDAR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR CONFIG AGENDA": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR TOKENS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRIAR EVENTO": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR ETIQUETAS ATUAIS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR ETIQUETAS ATUAIS": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR ETIQUETAS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR ETIQUETAS": {
+      "main": [
+        [
+          {
+            "node": "DEFINIR ETIQUETA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GATILHO": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR CONFIG AGENDA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DEFINIR ETIQUETA": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR SALVAR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR SALVAR": {
+      "main": [
+        [
+          {
+            "node": "SALVAR AGENDAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SALVAR AGENDAMENTO": {
+      "main": [
+        [
+          {
+            "node": "RETORNAR OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VALIDAR": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR BLOQUEIOS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR BLOQUEIOS": {
+      "main": [
+        [
+          {
+            "node": "CHECAR BLOQUEIO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CHECAR BLOQUEIO": {
+      "main": [
+        [
+          {
+            "node": "PRECISA PAGAMENTO?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PRECISA PAGAMENTO?": {
+      "main": [
+        [
+          {
+            "node": "TEM TOKEN?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "BUSCAR PAGAMENTO PENDENTE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR PAGAMENTO PENDENTE": {
+      "main": [
+        [
+          {
+            "node": "RESOLVER PAGAMENTO AGENDAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RESOLVER PAGAMENTO AGENDAMENTO": {
+      "main": [
+        [
+          {
+            "node": "PRECISA GERAR PIX?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PRECISA GERAR PIX?": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR CONFIG PAGAMENTO EMPRESA AGENDA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RETORNAR AGUARDANDO PAGAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR CONFIG PAGAMENTO EMPRESA AGENDA": {
+      "main": [
+        [
+          {
+            "node": "MP CONFIGURADO?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MP CONFIGURADO?": {
+      "main": [
+        [
+          {
+            "node": "CRIAR AGENDAMENTO PAGAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RETORNAR ERRO CONFIG PAGAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRIAR AGENDAMENTO PAGAMENTO": {
+      "main": [
+        [
+          {
+            "node": "GERAR COBRANCA MP AGENDA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GERAR COBRANCA MP AGENDA": {
+      "main": [
+        [
+          {
+            "node": "ATUALIZAR AGENDAMENTO PAGAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ATUALIZAR AGENDAMENTO PAGAMENTO": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR QR AGENDA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR QR AGENDA": {
+      "main": [
+        [
+          {
+            "node": "ENVIAR QR AGENDA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ENVIAR QR AGENDA": {
+      "main": [
+        [
+          {
+            "node": "ENVIAR CODIGO COPIA COLA AGENDA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ENVIAR CODIGO COPIA COLA AGENDA": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR LABELS AGENDA PAGAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR LABELS AGENDA PAGAMENTO": {
+      "main": [
+        [
+          {
+            "node": "DEFINIR LABEL AGUARDANDO PAGAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DEFINIR LABEL AGUARDANDO PAGAMENTO": {
+      "main": [
+        [
+          {
+            "node": "RETORNAR PIX GERADO AGENDA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  }
+}

@@ -1,0 +1,154 @@
+{
+  "id": "6D1lbadl4USalT35",
+  "name": "LEMBRETE - VERIFICAR",
+  "nodes": [
+    {
+      "id": "873b634d-0a56-490b-8916-0daac6577fff",
+      "name": "AGENDADOR",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e16e1108-6a79-4564-9487-ea061731f78c",
+      "name": "BUSCAR AGENDAMENTOS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/appointments?select=id,company_id,conversation_id,scheduled_at,title,companies(chatwoot_account_id,ai_prompt)&status=eq.agendado&scheduled_at=gte.{{ $now.plus({ hours: 1, minutes: 50 }).toISO() }}&scheduled_at=lte.{{ $now.plus({ hours: 2, minutes: 10 }).toISO() }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d1a85361-fde0-4d72-9f4e-e90cc6c9aab0",
+      "name": "CHAMAR LEMBRETE",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "sol30qBTST7TfrZl"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "agendamento_id": "={{ $json.id }}",
+            "id_conta": "={{ Number($json.companies.chatwoot_account_id) }}",
+            "id_conversa": "={{ Number($json.conversation_id) }}",
+            "data_hora": "={{ $json.scheduled_at }}",
+            "titulo": "={{ $json.title }}",
+            "prompt_nicho": "={{ $json.companies.ai_prompt }}",
+            "url_chatwoot": "{{ $env.CHATWOOT_URL }}",
+            "token_chatwoot": "{{ $env.CHATWOOT_AGENCY_TOKEN }}"
+          },
+          "schema": [
+            {
+              "id": "agendamento_id",
+              "displayName": "agendamento_id",
+              "type": "string"
+            },
+            {
+              "id": "id_conta",
+              "displayName": "id_conta",
+              "type": "number"
+            },
+            {
+              "id": "id_conversa",
+              "displayName": "id_conversa",
+              "type": "number"
+            },
+            {
+              "id": "data_hora",
+              "displayName": "data_hora",
+              "type": "string"
+            },
+            {
+              "id": "titulo",
+              "displayName": "titulo",
+              "type": "string"
+            },
+            {
+              "id": "prompt_nicho",
+              "displayName": "prompt_nicho",
+              "type": "string"
+            },
+            {
+              "id": "url_chatwoot",
+              "displayName": "url_chatwoot",
+              "type": "string"
+            },
+            {
+              "id": "token_chatwoot",
+              "displayName": "token_chatwoot",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "AGENDADOR": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR AGENDAMENTOS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR AGENDAMENTOS": {
+      "main": [
+        [
+          {
+            "node": "CHAMAR LEMBRETE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}

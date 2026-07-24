@@ -1,0 +1,570 @@
+{
+  "id": "SRQKihi0GaDxpZhN",
+  "name": "ATENDIMENTO - TRANSFERIR HUMANO",
+  "nodes": [
+    {
+      "id": "e91a69b5-8fdb-488c-b516-2907ebe46521",
+      "name": "GATILHO",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "id_conta",
+              "type": "number"
+            },
+            {
+              "name": "id_conversa",
+              "type": "number"
+            },
+            {
+              "name": "url_chatwoot",
+              "type": "string"
+            },
+            {
+              "name": "token",
+              "type": "string"
+            },
+            {
+              "name": "departamento",
+              "type": "string"
+            },
+            {
+              "name": "company_id",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "91ee2a31-792e-4419-80ff-052eebcfd455",
+      "name": "BUSCAR LABELS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url_chatwoot }}/api/v1/accounts/{{ $json.id_conta }}/conversations/{{ $json.id_conversa }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $json.token }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "64f4cc76-2745-42f6-a7c0-b3c5a77e29e6",
+      "name": "PREPARAR LABELS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "jsCode": "var labels = $json.payload || [];\nif (!labels.includes('falar_humano')) labels.push('falar_humano');\nlabels = labels.filter(function(l) { return l !== 'aguardando_confirmacao' && l !== 'aguardando_nps'; });\nreturn [{ json: { labels: labels, body: JSON.stringify({ labels: labels }) } }];"
+      }
+    },
+    {
+      "id": "e6bb6c1d-3a7a-46fa-af33-fb8a7ded9bc2",
+      "name": "DEFINIR LABELS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.id_conta }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "59c37311-bab5-47bb-987b-8b7a53777a99",
+      "name": "ENVIAR MENSAGEM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.id_conta }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "Perfeito! Estou te conectando com um de nossos atendentes agora, aguarde um instante."
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            },
+            {
+              "name": "private",
+              "value": "false"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "737565a0-a2ca-44cc-8bd5-338d67f34ef9",
+      "name": "RETORNAR OK",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "confirmacao",
+              "value": "Transferido para atendente humano. Label falar_humano adicionada.",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "9d36e618-e95a-4143-ae96-0afc0a86fd38",
+      "name": "BUSCAR TIMES",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot + '/api/v1/accounts/' + $('GATILHO').item.json.id_conta + '/teams' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "126f63e0-be71-4fd1-aa52-c6f401b2a60f",
+      "name": "ENCONTRAR TIME",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const dep = $('GATILHO').item.json.departamento || 'humano';\nconst teams = Array.isArray($input.first().json) ? $input.first().json : [];\nconst team = teams.find(t => t.name === dep);\nreturn [{ json: { team_id: team ? team.id : null } }];"
+      }
+    },
+    {
+      "id": "95ab5ad9-470d-48a9-9842-3cf1fb221611",
+      "name": "ATRIBUIR TIME",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1568,
+        0
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot + '/api/v1/accounts/' + $('GATILHO').item.json.id_conta + '/conversations/' + $('GATILHO').item.json.id_conversa }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ team_id: $json.team_id }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "3f914a6b-8a49-4f33-9dd1-f7dcdc41fec8",
+      "name": "VERIFICAR HORARIO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const cfg = $json || {};\nconst dias = cfg.horario_atendimento_dias || [1,2,3,4,5];\nconst inicio = (cfg.horario_atendimento_inicio || '08:00:00').slice(0,5);\nconst fim = (cfg.horario_atendimento_fim || '18:00:00').slice(0,5);\nconst now = new Date();\nconst spOffset = -3 * 60 * 60 * 1000;\nconst spDate = new Date(now.getTime() + spOffset);\nconst spHour = spDate.getUTCHours();\nconst spMin = spDate.getUTCMinutes();\nconst spDay = spDate.getUTCDay();\nconst nowMinutes = spHour * 60 + spMin;\nconst [hi, mi] = inicio.split(':').map(Number);\nconst [hf, mf] = fim.split(':').map(Number);\nconst inicioMinutes = hi * 60 + mi;\nconst fimMinutes = hf * 60 + mf;\nconst overnight = fimMinutes <= inicioMinutes;\nlet isBusinessHour;\nif (overnight) {\n  isBusinessHour = nowMinutes >= inicioMinutes || nowMinutes < fimMinutes;\n} else {\n  isBusinessHour = nowMinutes >= inicioMinutes && nowMinutes < fimMinutes;\n}\nconst diaCheck = overnight ? (dias.includes(spDay) || dias.includes((spDay + 6) % 7)) : dias.includes(spDay);\nconst DIA_NOMES = ['dom','seg','ter','qua','qui','sex','sab'];\nconst diasOrdenados = [...dias].sort(function(a,b){ return a-b; });\nconst diasTexto = diasOrdenados.map(function(d){ return DIA_NOMES[d]; }).join(', ');\nconst horarioTexto = diasTexto + '., das ' + inicio + ' as ' + fim;\nreturn [{ json: { dentro_horario: diaCheck && isBusinessHour, horario_texto: horarioTexto } }];"
+      }
+    },
+    {
+      "id": "97601c59-eeb6-45ff-aeb2-2c91bd18effa",
+      "name": "CHECAR HORARIO",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2016,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-hr",
+              "leftValue": "={{ $json.dentro_horario }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "cf36cedd-8a2c-417b-ac23-db3d92e096f7",
+      "name": "AVISAR FORA DO HORARIO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2240,
+        160
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.id_conta }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "={{ 'Sua solicitacao foi registrada! Estamos fora do horario de atendimento no momento (' + $json.horario_texto + '). Um de nossos atendentes entrara em contato o mais breve possivel. Obrigado pela compreensao!' }}"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            },
+            {
+              "name": "private",
+              "value": "false"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "buscar-config-horario",
+      "name": "BUSCAR CONFIG HORARIO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1792,
+        0
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/companies?select=horario_atendimento_dias,horario_atendimento_inicio,horario_atendimento_fim&id=eq.{{ $('GATILHO').item.json.company_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "definir-prioridade-transf",
+      "name": "DEFINIR PRIORIDADE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1568,
+        160
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot + '/api/v1/accounts/' + $('GATILHO').item.json.id_conta + '/conversations/' + $('GATILHO').item.json.id_conversa + '/toggle_priority' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ priority: \"high\" }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "GATILHO": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR LABELS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR LABELS": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR LABELS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR LABELS": {
+      "main": [
+        [
+          {
+            "node": "DEFINIR LABELS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ENVIAR MENSAGEM": {
+      "main": [
+        [
+          {
+            "node": "RETORNAR OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DEFINIR LABELS": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR TIMES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR TIMES": {
+      "main": [
+        [
+          {
+            "node": "ENCONTRAR TIME",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ENCONTRAR TIME": {
+      "main": [
+        [
+          {
+            "node": "ATRIBUIR TIME",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ATRIBUIR TIME": {
+      "main": [
+        [
+          {
+            "node": "DEFINIR PRIORIDADE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VERIFICAR HORARIO": {
+      "main": [
+        [
+          {
+            "node": "CHECAR HORARIO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CHECAR HORARIO": {
+      "main": [
+        [
+          {
+            "node": "ENVIAR MENSAGEM",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AVISAR FORA DO HORARIO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AVISAR FORA DO HORARIO": {
+      "main": [
+        [
+          {
+            "node": "RETORNAR OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR CONFIG HORARIO": {
+      "main": [
+        [
+          {
+            "node": "VERIFICAR HORARIO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DEFINIR PRIORIDADE": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR CONFIG HORARIO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}

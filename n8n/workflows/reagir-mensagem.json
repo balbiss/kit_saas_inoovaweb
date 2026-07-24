@@ -1,0 +1,99 @@
+{
+  "id": "YnrKcVwPUCYOJiXI",
+  "name": "REAGIR - MENSAGEM",
+  "nodes": [
+    {
+      "id": "aa9e0b1f-88b6-41df-a614-4c7eb3dcff24",
+      "name": "GATILHO",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "emoji",
+              "type": "string"
+            },
+            {
+              "name": "message_id",
+              "type": "number"
+            },
+            {
+              "name": "id_conversa",
+              "type": "number"
+            },
+            {
+              "name": "id_conta",
+              "type": "number"
+            },
+            {
+              "name": "url_chatwoot",
+              "type": "string"
+            },
+            {
+              "name": "token",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f1b3cf2e-c9fb-4ce4-b475-0d7dbda32cc7",
+      "name": "REAGIR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url_chatwoot }}/api/v1/accounts/{{ $json.id_conta }}/conversations/{{ $json.id_conversa }}/messages/{{ $json.message_id }}/reactions",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "emoji",
+              "value": "={{ $json.emoji }}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "GATILHO": {
+      "main": [
+        [
+          {
+            "node": "REAGIR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}

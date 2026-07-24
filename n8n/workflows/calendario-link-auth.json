@@ -1,0 +1,88 @@
+{
+  "id": "h1UksAWbdCVxdLhi",
+  "name": "CALENDARIO - LINK AUTH",
+  "nodes": [
+    {
+      "id": "7d138e3d-0886-4d76-819d-9f30150af6e4",
+      "name": "WEBHOOK AUTH",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "calendario-auth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "eee57112-998c-413e-bd56-eea59d294faf"
+    },
+    {
+      "id": "2880c030-8ee7-475b-80cd-05b14e6323e7",
+      "name": "GERAR LINK",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "var id = $json.query.company_id || ''; var cid = '{{ $env.GOOGLE_CLIENT_ID }}'; var ru = '{{ $env.N8N_URL }}/webhook/calendario-callback'; var url = 'https://accounts.google.com/o/oauth2/auth?client_id=' + encodeURIComponent(cid) + '&redirect_uri=' + encodeURIComponent(ru) + '&response_type=code&scope=' + encodeURIComponent('https://www.googleapis.com/auth/calendar') + '&access_type=offline&prompt=consent&state=' + encodeURIComponent(String(id)); var html = '<!DOCTYPE html><html lang=\"pt-BR\"><head><meta charset=\"UTF-8\"><title>Conectar Calendario</title><style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f0f4f8;margin:0}.card{background:white;border-radius:16px;padding:40px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.1);max-width:400px;width:90%}.title{font-size:22px;font-weight:700;color:#1a202c;margin-bottom:12px}.desc{color:#64748b;font-size:14px;margin-bottom:28px;line-height:1.6}.btn{display:inline-block;background:#4f46e5;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:600;font-size:15px}.info{margin-top:16px;font-size:12px;color:#94a3b8}</style></head><body><div class=\"card\"><div class=\"title\">Conectar Google Calendar</div><div class=\"desc\">Clique abaixo para autorizar o assistente de IA a criar agendamentos automaticamente no seu Google Calendar.</div><a class=\"btn\" href=\"' + url + '\">Conectar com Google</a><div class=\"info\">Conta: ' + id + '</div></div></body></html>'; return [{ json: { html: html } }];"
+      }
+    },
+    {
+      "id": "40d0f339-83b0-40a8-9aa6-08cc697f2daa",
+      "name": "SERVIR PAGINA",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "WEBHOOK AUTH": {
+      "main": [
+        [
+          {
+            "node": "GERAR LINK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GERAR LINK": {
+      "main": [
+        [
+          {
+            "node": "SERVIR PAGINA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}

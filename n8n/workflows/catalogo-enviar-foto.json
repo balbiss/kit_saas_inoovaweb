@@ -1,0 +1,141 @@
+{
+  "id": "0eVOL17DPdmG847G",
+  "name": "CATALOGO - ENVIAR FOTO",
+  "nodes": [
+    {
+      "id": "7b3fe946-9b59-4d50-a3b2-da9748a8eda2",
+      "name": "GATILHO",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "foto_url",
+              "type": "string"
+            },
+            {
+              "name": "legenda",
+              "type": "string"
+            },
+            {
+              "name": "url_chatwoot",
+              "type": "string"
+            },
+            {
+              "name": "id_conta",
+              "type": "number"
+            },
+            {
+              "name": "id_conversa",
+              "type": "number"
+            },
+            {
+              "name": "token",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8f8d51ca-dc83-457b-aa72-4fa3c40b95f4",
+      "name": "BAIXAR FOTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.foto_url }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        },
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "id": "5c577aee-cf32-454d-b461-4a6e96184ace",
+      "name": "ENVIAR FOTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.id_conta }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            },
+            {
+              "name": "content",
+              "value": "={{ $('GATILHO').item.json.legenda }}"
+            },
+            {
+              "name": "attachments[]",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "GATILHO": {
+      "main": [
+        [
+          {
+            "node": "BAIXAR FOTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BAIXAR FOTO": {
+      "main": [
+        [
+          {
+            "node": "ENVIAR FOTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}

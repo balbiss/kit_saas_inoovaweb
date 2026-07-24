@@ -1,0 +1,131 @@
+{
+  "id": "b1eoEPTan6YklaOL",
+  "name": "CATALOGO - BUSCAR PRODUTO",
+  "nodes": [
+    {
+      "id": "c42ecc65-6e10-4096-ae3d-5e3564a54d1c",
+      "name": "GATILHO",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "keyword",
+              "type": "string"
+            },
+            {
+              "name": "company_id",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "38be89ab-5f4e-4af1-96ce-f91542589a34",
+      "name": "PREPARAR BUSCA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const kw = ($json.keyword || '').replace(/'/g, \"''\"); return { json: { company_id: $json.company_id, like_kw: '*' + kw + '*' } };"
+      }
+    },
+    {
+      "id": "94ce0c24-5ec8-42cd-b6a6-216a7cabd595",
+      "name": "BUSCAR NO CATALOGO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "{{ $env.SUPABASE_URL }}/rest/v1/products",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "select",
+              "value": "id,name,description,price,category,photo_url"
+            },
+            {
+              "name": "company_id",
+              "value": "=eq.{{ $json.company_id }}"
+            },
+            {
+              "name": "available",
+              "value": "eq.true"
+            },
+            {
+              "name": "or",
+              "value": "=(name.ilike.{{ $json.like_kw }},category.ilike.{{ $json.like_kw }},description.ilike.{{ $json.like_kw }})"
+            },
+            {
+              "name": "limit",
+              "value": "5"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HcfnrNOxcvDi7h8H",
+          "name": "chatwoot_db"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "GATILHO": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR BUSCA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR BUSCA": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR NO CATALOGO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}

@@ -1,0 +1,711 @@
+{
+  "id": "HfQ7RwXZZMah4bk1",
+  "name": "CALENDARIO - REAGENDAR",
+  "nodes": [
+    {
+      "id": "10c7951d-1375-4dc0-9a6d-f9764e8b90a3",
+      "name": "GATILHO",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        192
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "company_id",
+              "type": "string"
+            },
+            {
+              "name": "chatwoot_account_id",
+              "type": "number"
+            },
+            {
+              "name": "id_conversa",
+              "type": "number"
+            },
+            {
+              "name": "url_chatwoot",
+              "type": "string"
+            },
+            {
+              "name": "token",
+              "type": "string"
+            },
+            {
+              "name": "nova_data_hora",
+              "type": "string"
+            },
+            {
+              "name": "nome_lead",
+              "type": "string"
+            },
+            {
+              "name": "telefone",
+              "type": "string"
+            },
+            {
+              "name": "descricao",
+              "type": "string"
+            },
+            {
+              "name": "termo_contato",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8035e153-1d64-4fe1-a124-2dd042725eeb",
+      "name": "BUSCAR AGENDAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        192
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/appointments?select=id,google_event_id,title,resource_id,resources(calendar_id,agenda_config(duracao_minutos))&company_id=eq.{{ $('GATILHO').item.json.company_id }}&conversation_id=eq.{{ $('GATILHO').item.json.id_conversa }}&status=in.(agendado,lembrete_enviado,confirmado)&order=created_at.desc&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "4a912917-5b94-4d94-bd6c-753b9a711e95",
+      "name": "TEM AGENDAMENTO?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        192
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.google_event_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "90c3ee10-9a0e-4389-b0cd-ab5bcb34a2a1",
+      "name": "BUSCAR TOKENS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        96
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/functions/v1/get-calendar-token",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "company_id",
+              "value": "={{ $('GATILHO').item.json.company_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxYmVqdmh1YXZ6amVrem5vdWFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2ODY1NDMsImV4cCI6MjEwMDI2MjU0M30.VyulYtfVCpldH4OV8uDebVQumHcLmPJzFUENUpMzDoE"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "999a1720-07f6-41ea-87b5-3b89eba7ac5c",
+      "name": "TEM TOKEN?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.refresh_token }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "d0aaaaae-b9d3-43c6-a3e0-1830d043c590",
+      "name": "RENOVAR TOKEN",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://oauth2.googleapis.com/token",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "refresh_token",
+              "value": "={{ $json.refresh_token }}"
+            },
+            {
+              "name": "client_id",
+              "value": "{{ $env.GOOGLE_CLIENT_ID }}"
+            },
+            {
+              "name": "client_secret",
+              "value": "{{ $env.GOOGLE_CLIENT_SECRET }}"
+            },
+            {
+              "name": "grant_type",
+              "value": "refresh_token"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "38594068-91d7-4497-8fbf-7bc3b8e6d33b",
+      "name": "DELETAR EVENTO ANTIGO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1568,
+        0
+      ],
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent(($('BUSCAR AGENDAMENTO').item.json.resources && $('BUSCAR AGENDAMENTO').item.json.resources.calendar_id) || $('BUSCAR TOKENS').item.json.calendar_id || 'primary') }}/events/{{ $('BUSCAR AGENDAMENTO').item.json.google_event_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "65cfd820-7eb3-4c9b-877e-a32897f7c627",
+      "name": "PREPARAR NOVO EVENTO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        0
+      ],
+      "parameters": {
+        "jsCode": "var g = $('GATILHO').item.json; var ag = $('BUSCAR AGENDAMENTO').item.json; var tk = $('BUSCAR TOKENS').item.json; var at = $('RENOVAR TOKEN').item.json; var duracao = (ag.resources && ag.resources.agenda_config && parseInt(ag.resources.agenda_config.duracao_minutos)) || 60; var calendarId = (ag.resources && ag.resources.calendar_id) || tk.calendar_id || 'primary'; var inicio = g.nova_data_hora.includes('+') || g.nova_data_hora.includes('Z') ? g.nova_data_hora : g.nova_data_hora + '-03:00'; var dInicio = new Date(inicio); var dFim = new Date(dInicio.getTime() + duracao * 60000); var fim = dFim.toISOString().replace('Z', '-03:00'); var titulo = 'REAGENDADO - ' + (ag.title || ''); var descParts = [(g.termo_contato || 'Cliente') + ': ' + g.nome_lead]; if (g.telefone) descParts.push('WhatsApp: ' + g.telefone); if (g.descricao) descParts.push(g.descricao); return [{ json: { access_token: at.access_token, calendar_id: calendarId, titulo: titulo, evento: { summary: titulo, description: descParts.join('\\n'), start: { dateTime: inicio, timeZone: 'America/Sao_Paulo' }, end: { dateTime: fim, timeZone: 'America/Sao_Paulo' } } } }];"
+      }
+    },
+    {
+      "id": "06228bb7-1cfc-462c-b792-9ee380547504",
+      "name": "CRIAR NOVO EVENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2016,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($json.calendar_id) }}/events",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.evento) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "47e22060-1b0f-4add-8af9-0d574d8dfd95",
+      "name": "PREPARAR REAGENDAMENTO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "var g = $('GATILHO').item.json; var ag = $('BUSCAR AGENDAMENTO').item.json; var ev = $('CRIAR NOVO EVENTO').item.json; return [{ json: { old_id: ag.id, novo: { company_id: g.company_id, resource_id: ag.resource_id || null, conversation_id: g.id_conversa ? String(g.id_conversa) : null, contact_phone: g.telefone || null, title: 'REAGENDADO - ' + (ag.title || ''), scheduled_at: ev.start.dateTime, google_event_id: ev.id, google_event_link: ev.htmlLink || '', status: 'agendado' }, htmlLink: ev.htmlLink } }];"
+      }
+    },
+    {
+      "id": "313f3b89-10c4-435a-8bdc-f5cfcf62e4e3",
+      "name": "ATUALIZAR REGISTRO ANTIGO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2464,
+        0
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/appointments?id=eq.{{ $('PREPARAR REAGENDAMENTO').item.json.old_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'reagendado' }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "4ab43c14-3253-4ec4-985c-00da50558ae5",
+      "name": "BUSCAR LABELS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2688,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.chatwoot_account_id }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "f4db32d4-cc62-4208-ad49-53c5d97cd05f",
+      "name": "PREPARAR LABELS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2912,
+        0
+      ],
+      "parameters": {
+        "jsCode": "var labels = $json.payload || []; labels = labels.filter(function(l) { return l !== 'aguardando_confirmacao'; }); return [{ json: { labels: labels, body: JSON.stringify({ labels: labels }) } }];"
+      }
+    },
+    {
+      "id": "eaf63faf-4d40-4b24-b68f-877021fcd3f9",
+      "name": "REMOVER LABEL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3136,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.chatwoot_account_id }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "380bdde7-e827-495c-80b8-9bc3f7114b6a",
+      "name": "RETORNAR OK",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3360,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "conf",
+              "name": "confirmacao",
+              "value": "=Reagendado com sucesso! O novo compromisso foi criado no Google Calendar como 'REAGENDADO'. Link: {{ $('PREPARAR REAGENDAMENTO').item.json.htmlLink }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "547a7048-fe2a-4e83-a1e6-5041198b873a",
+      "name": "SEM CALENDARIO",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1344,
+        192
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "conf",
+              "name": "confirmacao",
+              "value": "Google Calendar nao conectado para esta conta.",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "dae40170-bf31-4a32-94fb-e336a5a19fb4",
+      "name": "SEM AGENDAMENTO",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        288
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "conf",
+              "name": "confirmacao",
+              "value": "Nenhum compromisso ativo encontrado para reagendar.",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "criar-novo-registro-node",
+      "name": "CRIAR NOVO REGISTRO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2704,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/appointments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('PREPARAR REAGENDAMENTO').item.json.novo) }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "GATILHO": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR AGENDAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR AGENDAMENTO": {
+      "main": [
+        [
+          {
+            "node": "TEM AGENDAMENTO?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEM AGENDAMENTO?": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR TOKENS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SEM AGENDAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR TOKENS": {
+      "main": [
+        [
+          {
+            "node": "TEM TOKEN?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEM TOKEN?": {
+      "main": [
+        [
+          {
+            "node": "RENOVAR TOKEN",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SEM CALENDARIO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RENOVAR TOKEN": {
+      "main": [
+        [
+          {
+            "node": "DELETAR EVENTO ANTIGO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DELETAR EVENTO ANTIGO": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR NOVO EVENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR NOVO EVENTO": {
+      "main": [
+        [
+          {
+            "node": "CRIAR NOVO EVENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRIAR NOVO EVENTO": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR REAGENDAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR LABELS": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR LABELS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR LABELS": {
+      "main": [
+        [
+          {
+            "node": "REMOVER LABEL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "REMOVER LABEL": {
+      "main": [
+        [
+          {
+            "node": "RETORNAR OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR REAGENDAMENTO": {
+      "main": [
+        [
+          {
+            "node": "ATUALIZAR REGISTRO ANTIGO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ATUALIZAR REGISTRO ANTIGO": {
+      "main": [
+        [
+          {
+            "node": "CRIAR NOVO REGISTRO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRIAR NOVO REGISTRO": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR LABELS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}

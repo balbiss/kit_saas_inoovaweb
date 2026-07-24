@@ -1,0 +1,300 @@
+{
+  "id": "4DFh8mxclMZUhYF3",
+  "name": "QUALIFICAR LEAD - MATRIZ CRM",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "nivel_qualificacao"
+            },
+            {
+              "name": "resumo_conversa"
+            },
+            {
+              "name": "url_chatwoot"
+            },
+            {
+              "name": "id_conta"
+            },
+            {
+              "name": "id_conversa"
+            },
+            {
+              "name": "telefone"
+            },
+            {
+              "name": "tokem"
+            },
+            {
+              "name": "atendentes",
+              "type": "array"
+            },
+            {
+              "name": "departamento"
+            }
+          ]
+        }
+      },
+      "id": "d3d93bf1-0100-4320-84f7-60ffbdd2bc78",
+      "typeVersion": 1.1,
+      "name": "GATILHO",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $json.id_conta }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/labels",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "={{ $json.tokem }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $json.tokem }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "2780db98-fbb7-4607-b181-9076827b8b21",
+      "name": "BUSCAR ETIQUETAS"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.id_conta }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/labels",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "={{ $('GATILHO').item.json.tokem }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.tokem }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "labels",
+              "value": "={{ $json.payload.append($('GATILHO').item.json.nivel_qualificacao).append('agente_off').append($('GATILHO').item.json.departamento) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "44b2af04-ccf0-4eff-9f7c-f6265d1c34bf",
+      "name": "ATRIBUIR ETIQUETA"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.id_conta }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "={{ $('GATILHO').item.json.tokem }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.tokem }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "={{ $('GATILHO').item.json.resumo_conversa }}"
+            },
+            {
+              "name": "private",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        0
+      ],
+      "id": "66c8e86c-b4c0-4d51-b395-08fa7e8c7575",
+      "name": "RESUMO PRIMADO"
+    },
+    {
+      "id": "2ab4b078-98f0-421f-a11b-f3fb192410b5",
+      "name": "ATRIBUIR TIME",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        944,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.id_conta }}/conversations/{{ $('GATILHO').item.json.id_conversa }}/assignments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.tokem }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "team_id",
+              "value": "={{ $('ESCOLHER TIME').item.json.team_id }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "3ccfd0ed-dc7e-477a-9f10-38f4960490ac",
+      "name": "BUSCAR TIMES",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        0
+      ],
+      "parameters": {
+        "url": "={{ $('GATILHO').item.json.url_chatwoot }}/api/v1/accounts/{{ $('GATILHO').item.json.id_conta }}/teams",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.tokem }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "57defd9a-b248-484b-bbd9-ffab3f789d07",
+      "name": "ESCOLHER TIME",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const times = $input.all().map(i => i.json);\nconst departamento = ($('GATILHO').item.json.departamento || 'humano').toLowerCase();\nconst encontrado = times.find(t => (t.name || '').toLowerCase() === departamento);\nconst fallback = times.find(t => (t.name || '').toLowerCase() === 'humano');\nreturn [{ json: { team_id: (encontrado || fallback || times[0] || {}).id } }];"
+      }
+    }
+  ],
+  "connections": {
+    "GATILHO": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR ETIQUETAS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR ETIQUETAS": {
+      "main": [
+        [
+          {
+            "node": "ATRIBUIR ETIQUETA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ATRIBUIR ETIQUETA": {
+      "main": [
+        [
+          {
+            "node": "RESUMO PRIMADO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ATRIBUIR TIME": {
+      "main": [
+        []
+      ]
+    },
+    "RESUMO PRIMADO": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR TIMES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR TIMES": {
+      "main": [
+        [
+          {
+            "node": "ESCOLHER TIME",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ESCOLHER TIME": {
+      "main": [
+        [
+          {
+            "node": "ATRIBUIR TIME",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  }
+}
