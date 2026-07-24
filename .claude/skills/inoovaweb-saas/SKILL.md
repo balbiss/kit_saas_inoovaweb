@@ -7,6 +7,8 @@ description: Arquitetura, padrões e armadilhas do InoovaWeb — SaaS de atendim
 
 SaaS multi-tenant de atendimento via WhatsApp com IA. Qualquer nicho (clínica, imobiliária, loja, salão, etc.) pode rodar nele — cada empresa é uma conta isolada. Este guia existe pra qualquer sessão do Claude Code que for mexer no sistema não precisar redescobrir do zero como as peças se encaixam.
 
+**Instalando do zero pela primeira vez?** Pare de ler aqui e siga `INSTALACAO.md` — é um manual passo a passo escrito pra você seguir sozinho, parando pra pedir informação ao usuário exatamente nos pontos em que só ele pode fornecer (contas, domínios, credenciais, ações físicas). O resto deste arquivo (e `WORKFLOWS.md`/`GOTCHAS.md`) é referência de arquitetura — útil durante a instalação e depois, pra manutenção.
+
 ## As 4 partes do sistema
 
 1. **Painel** — app React (TanStack Start), onde cada empresa configura prompt da IA, agenda, produtos, documentos, leads, métricas e pagamento (Mercado Pago). Repo próprio, deploy como imagem Docker.
