@@ -57,7 +57,7 @@
           "parameters": [
             {
               "name": "select",
-              "value": "id,name,description,price,category,photo_url"
+              "value": "id,name,description,price,category,photo_url,midias:product_media(url,tipo,ordem)"
             },
             {
               "name": "company_id",
@@ -74,6 +74,10 @@
             {
               "name": "limit",
               "value": "5"
+            },
+            {
+              "name": "product_media.order",
+              "value": "ordem.asc"
             }
           ]
         },

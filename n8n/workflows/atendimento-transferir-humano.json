@@ -219,7 +219,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "const dep = $('GATILHO').item.json.departamento || 'humano';\nconst teams = Array.isArray($input.first().json) ? $input.first().json : [];\nconst team = teams.find(t => t.name === dep);\nreturn [{ json: { team_id: team ? team.id : null } }];"
+        "jsCode": "const dep = $('GATILHO').item.json.departamento || 'humano';\nconst teams = $input.all().map(function(i) { return i.json; }).filter(function(t) { return t && t.id; });\nconst team = teams.find(t => t.name === dep);\nreturn [{ json: { team_id: team ? team.id : null } }];"
       }
     },
     {
@@ -232,8 +232,8 @@
         0
       ],
       "parameters": {
-        "method": "PATCH",
-        "url": "={{ $('GATILHO').item.json.url_chatwoot + '/api/v1/accounts/' + $('GATILHO').item.json.id_conta + '/conversations/' + $('GATILHO').item.json.id_conversa }}",
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot + '/api/v1/accounts/' + $('GATILHO').item.json.id_conta + '/conversations/' + $('GATILHO').item.json.id_conversa + '/assignments' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -409,6 +409,84 @@
           }
         }
       }
+    },
+    {
+      "id": "buscar-membros-time",
+      "name": "BUSCAR MEMBROS DO TIME",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1564,
+        0
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot + '/api/v1/accounts/' + $('GATILHO').item.json.id_conta + '/teams/' + $('ENCONTRAR TIME').item.json.team_id + '/team_members' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "escolher-agente-time",
+      "name": "ESCOLHER AGENTE",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1784,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "var teamId = $('ENCONTRAR TIME').item.json.team_id;\nvar membros = $input.all().map(function(i){ return i.json; }).filter(function(m){ return m && m.id; });\nvar escolhido = membros.find(function(m){ return m.availability_status === 'online'; })\n  || membros.find(function(m){ return m.availability_status === 'busy'; })\n  || membros[0];\nreturn [{ json: { team_id: teamId, assignee_id: escolhido ? escolhido.id : null } }];"
+      }
+    },
+    {
+      "id": "atribuir-agente-separado",
+      "name": "ATRIBUIR AGENTE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1568,
+        80
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('GATILHO').item.json.url_chatwoot + '/api/v1/accounts/' + $('GATILHO').item.json.id_conta + '/conversations/' + $('GATILHO').item.json.id_conversa + '/assignments' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "={{ $('GATILHO').item.json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ assignee_id: $('ESCOLHER AGENTE').item.json.assignee_id }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
     }
   ],
   "connections": {
@@ -482,7 +560,7 @@
       "main": [
         [
           {
-            "node": "ATRIBUIR TIME",
+            "node": "BUSCAR MEMBROS DO TIME",
             "type": "main",
             "index": 0
           }
@@ -493,7 +571,7 @@
       "main": [
         [
           {
-            "node": "DEFINIR PRIORIDADE",
+            "node": "ATRIBUIR AGENTE",
             "type": "main",
             "index": 0
           }
@@ -556,6 +634,39 @@
         [
           {
             "node": "BUSCAR CONFIG HORARIO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR MEMBROS DO TIME": {
+      "main": [
+        [
+          {
+            "node": "ESCOLHER AGENTE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ESCOLHER AGENTE": {
+      "main": [
+        [
+          {
+            "node": "ATRIBUIR TIME",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ATRIBUIR AGENTE": {
+      "main": [
+        [
+          {
+            "node": "DEFINIR PRIORIDADE",
             "type": "main",
             "index": 0
           }

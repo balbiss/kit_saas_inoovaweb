@@ -422,7 +422,7 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ (($json.labels || []).some(l => ['agente_off','pago','confirmado'].includes(l))) || $json.status === 'resolved' }}",
+              "leftValue": "={{ (($json.labels || []).some(l => ['agente_off','falar_humano','pago','confirmado'].includes(l))) || $json.status === 'resolved' }}",
               "operator": {
                 "type": "boolean",
                 "operation": "equals"

@@ -72,7 +72,7 @@
           "parameters": [
             {
               "name": "select",
-              "value": "nome:name,descricao:description,preco:price,categoria:category,foto_url:photo_url"
+              "value": "nome:name,descricao:description,preco:price,categoria:category,foto_url:photo_url,midias:product_media(url,tipo,ordem)"
             },
             {
               "name": "company_id",
@@ -85,6 +85,10 @@
             {
               "name": "limit",
               "value": "5"
+            },
+            {
+              "name": "product_media.order",
+              "value": "ordem.asc"
             }
           ]
         },
@@ -121,12 +125,12 @@
         0
       ],
       "parameters": {
-        "jsCode": "const items = $input.all();\nconst produtos = items.map(function(i) { return i.json; }).filter(function(p) { return p.nome; });\nif (!produtos.length) {\n  return [{ json: { texto: 'Nenhum produto encontrado no catalogo para essa busca.', foto_url: '', legenda: '' } }];\n}\nfunction fmt(p) {\n  const preco = p.preco ? 'R$ ' + parseFloat(p.preco).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';\n  let linha = '*' + p.nome + '*';\n  if (preco) linha += ' — ' + preco;\n  if (p.descricao) linha += '\\n' + p.descricao;\n  if (p.categoria) linha += '\\nCategoria: ' + p.categoria;\n  return linha;\n}\nconst texto = produtos.map(fmt).join('\\n\\n');\nconst comFoto = produtos.find(function(p) { return p.foto_url; });\nconst foto_url = comFoto ? comFoto.foto_url : '';\nconst legenda = comFoto ? (comFoto.nome + (comFoto.preco ? ' — R$ ' + parseFloat(comFoto.preco).toLocaleString('pt-BR', {minimumFractionDigits: 2}) : '')) : '';\nreturn [{ json: { texto: texto, foto_url: foto_url, legenda: legenda } }];"
+        "jsCode": "const items = $input.all();\nconst produtos = items.map(function(i) { return i.json; }).filter(function(p) { return p.nome; });\nif (!produtos.length) {\n  return [{ json: { texto: 'Nenhum produto encontrado no catalogo para essa busca.', midias: [], legenda: '' } }];\n}\nfunction fmt(p) {\n  const preco = p.preco ? 'R$ ' + parseFloat(p.preco).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';\n  let linha = '*' + p.nome + '*';\n  if (preco) linha += ' — ' + preco;\n  if (p.descricao) linha += '\\n' + p.descricao;\n  if (p.categoria) linha += '\\nCategoria: ' + p.categoria;\n  return linha;\n}\nconst texto = produtos.map(fmt).join('\\n\\n');\nconst comMidia = produtos.find(function(p) { return p.foto_url || (p.midias && p.midias.length); });\nvar midias = [];\nvar legenda = '';\nif (comMidia) {\n  legenda = comMidia.nome + (comMidia.preco ? ' — R$ ' + parseFloat(comMidia.preco).toLocaleString('pt-BR', {minimumFractionDigits: 2}) : '');\n  if (comMidia.foto_url) midias.push({ url: comMidia.foto_url, tipo: 'foto' });\n  (comMidia.midias || []).forEach(function(m) { midias.push({ url: m.url, tipo: m.tipo }); });\n}\nreturn [{ json: { texto: texto, midias: midias, legenda: legenda } }];"
       }
     },
     {
       "id": "79ce86ec-c478-47fa-9a03-de6b23780f79",
-      "name": "TEM FOTO?",
+      "name": "TEM MIDIA?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
@@ -142,11 +146,13 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ $json.foto_url }}",
+              "leftValue": "={{ ($json.midias || []).length > 0 }}",
               "operator": {
-                "type": "string",
-                "operation": "notEmpty"
-              }
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": true
             }
           ],
           "combinator": "and"
@@ -155,7 +161,7 @@
     },
     {
       "id": "8e7b283f-aa6e-4567-b5d6-bd3aae18f374",
-      "name": "BAIXAR FOTO",
+      "name": "BAIXAR ARQUIVO MIDIA",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
@@ -164,7 +170,7 @@
       ],
       "parameters": {
         "method": "GET",
-        "url": "={{ $json.foto_url }}",
+        "url": "={{ $json.url }}",
         "options": {
           "timeout": 10000,
           "response": {
@@ -179,7 +185,7 @@
     },
     {
       "id": "aab864ab-cb63-4360-af6e-1aa96e66c3c1",
-      "name": "ENVIAR FOTO",
+      "name": "ENVIAR ARQUIVO MIDIA",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
@@ -208,7 +214,7 @@
             },
             {
               "name": "content",
-              "value": "={{ $('PROCESSAR').item.json.legenda }}"
+              "value": "={{ $json.legenda }}"
             },
             {
               "name": "attachments[]",
@@ -257,6 +263,34 @@
         "mode": "runOnceForAllItems",
         "jsCode": "function normalizeWords(s) {\n  var n = (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();\n  n = n.replace(/[^a-z0-9]+/g, ' ').trim();\n  return n.length ? n.split(/\\s+/).filter(function(w){ return w.length >= 2; }) : [];\n}\nvar produtos = $input.all().map(function(i){ return i.json; }).filter(function(p){ return p && p.nome; });\nvar keyword = ($('GATILHO').item.json.keyword || '').trim();\nif (!keyword || keyword === '%') {\n  return produtos.slice(0, 5).map(function(p){ return { json: p }; });\n}\nvar searchWords = normalizeWords(keyword);\nvar scored = produtos.map(function(p) {\n  var corpusWords = normalizeWords((p.nome || '') + ' ' + (p.descricao || '') + ' ' + (p.categoria || ''));\n  var overlap = searchWords.filter(function(w){ return corpusWords.indexOf(w) !== -1; }).length;\n  return { produto: p, overlap: overlap };\n});\nvar matched = scored.filter(function(s){ return s.overlap > 0; }).sort(function(a, b){ return b.overlap - a.overlap; }).slice(0, 5);\nif (!matched.length) {\n  return [{ json: {} }];\n}\nreturn matched.map(function(m){ return { json: m.produto }; });"
       }
+    },
+    {
+      "id": "expandir-midias-buscaenvia",
+      "name": "EXPANDIR MIDIAS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1090,
+        -120
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "var item = $input.all()[0].json;\nvar midias = item.midias || [];\nreturn midias.map(function(m){ return { json: { url: m.url, tipo: m.tipo, legenda: item.legenda } }; });"
+      }
+    },
+    {
+      "id": "convergir-buscaenvia",
+      "name": "CONVERGIR",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1570,
+        -120
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{ json: { texto: $('PROCESSAR').item.json.texto } }];"
+      }
     }
   ],
   "connections": {
@@ -297,18 +331,29 @@
       "main": [
         [
           {
-            "node": "TEM FOTO?",
+            "node": "TEM MIDIA?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "TEM FOTO?": {
+    "FILTRAR PRODUTOS": {
       "main": [
         [
           {
-            "node": "BAIXAR FOTO",
+            "node": "PROCESSAR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEM MIDIA?": {
+      "main": [
+        [
+          {
+            "node": "EXPANDIR MIDIAS",
             "type": "main",
             "index": 0
           }
@@ -322,33 +367,44 @@
         ]
       ]
     },
-    "BAIXAR FOTO": {
+    "EXPANDIR MIDIAS": {
       "main": [
         [
           {
-            "node": "ENVIAR FOTO",
+            "node": "BAIXAR ARQUIVO MIDIA",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "ENVIAR FOTO": {
+    "BAIXAR ARQUIVO MIDIA": {
+      "main": [
+        [
+          {
+            "node": "ENVIAR ARQUIVO MIDIA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ENVIAR ARQUIVO MIDIA": {
+      "main": [
+        [
+          {
+            "node": "CONVERGIR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CONVERGIR": {
       "main": [
         [
           {
             "node": "RETORNAR",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "FILTRAR PRODUTOS": {
-      "main": [
-        [
-          {
-            "node": "PROCESSAR",
             "type": "main",
             "index": 0
           }
