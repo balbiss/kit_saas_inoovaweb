@@ -4,13 +4,16 @@ O código do painel não é duplicado neste kit — vive no repo `saas-chatwoot`
 
 ## Variáveis de ambiente (apontar pro SEU projeto Supabase)
 
-O build (Vite) lê estas variáveis de `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` — definidas tanto no `Dockerfile` (linhas `ENV VITE_SUPABASE_...`) quanto num `.env` na raiz do repo (usado tanto pelo build local quanto pela CLI do Supabase). Troque as duas pelo valores do projeto Supabase que você criou (ver `../supabase/README.md`):
+O build (Vite) lê `VITE_SUPABASE_URL` / `VITE_SUPABASE_PROJECT_ID` / `VITE_SUPABASE_PUBLISHABLE_KEY`. O `Dockerfile` recebe esses 3 valores como **build args** (não fixos no código) — assim seu fork builda automaticamente apontando pro SEU Supabase, sem editar nenhum arquivo:
 
-```
-VITE_SUPABASE_URL=https://<seu-projeto>.supabase.co
-VITE_SUPABASE_PROJECT_ID=<seu-projeto>
-VITE_SUPABASE_PUBLISHABLE_KEY=<sua anon key>
-```
+- **Build automático via GitHub Actions** (recomendado, é o que já roda a cada push na `main`): no seu fork, vá em `Settings → Secrets and variables → Actions → aba Variables` e crie as 3 variáveis com os dados do projeto Supabase que você criou (ver `../supabase/README.md`):
+  ```
+  VITE_SUPABASE_URL=https://<seu-projeto>.supabase.co
+  VITE_SUPABASE_PROJECT_ID=<seu-projeto>
+  VITE_SUPABASE_PUBLISHABLE_KEY=<sua anon key>
+  ```
+  Feito isso uma vez, todo `git push` na `main` builda sozinho e publica a imagem em `ghcr.io/<seu-usuario>/saas-chatwoot:latest` — não precisa rodar Docker local.
+- **Build local** (se quiser testar sem depender do Actions): `docker build --build-arg VITE_SUPABASE_URL=... --build-arg VITE_SUPABASE_PROJECT_ID=... --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=... -t saas-chatwoot .`
 
 ## Pontos de rebrand (marca "InoovaWeb" → a sua)
 

@@ -4,39 +4,30 @@ As migrations e Edge Functions vivem no repo `saas-chatwoot` (pastas `supabase/m
 
 ## 1. Criar o projeto
 
-Crie um projeto novo em [supabase.com](https://supabase.com/dashboard). Anote a **URL do projeto**, a **anon/publishable key** (vão pro painel, ver `../painel/README.md`) e gere um **Personal Access Token** (Account → Access Tokens) pra usar via CLI/Management API.
+Crie um projeto novo em [supabase.com](https://supabase.com/dashboard). Anote a **URL do projeto**, o **project ref** (Project Settings → General), a **anon/publishable key** (vão pro painel, ver `../painel/README.md`) e gere um **Personal Access Token** (Account → Access Tokens).
 
-## 2. Aplicar as migrations
+## 2. Rodar o script de setup (automático)
 
 Dentro do repo `saas-chatwoot`:
 
 ```bash
+cp supabase/setup.env.example supabase/setup.env
+# abra supabase/setup.env e preencha com os dados do SEU projeto
+bash supabase/setup.sh
+```
+
+Esse script faz tudo em uma tacada só: aplica todas as migrations, deploya todas as Edge Functions e configura os secrets que elas precisam. Pode rodar de novo quantas vezes quiser (é seguro repetir). `supabase/setup.env` nunca é commitado (já está no `.gitignore`).
+
+Se preferir fazer manualmente (ou o script falhar em algum passo e quiser rodar só uma parte), os comandos que ele executa por baixo dos panos:
+
+```bash
 npx supabase login --token <seu-personal-access-token>
 npx supabase link --project-ref <seu-project-ref>
-npx supabase db push   # aplica todas as migrations de supabase/migrations/ em ordem
+npx supabase db push                                                            # migrations
+npx supabase functions deploy <nome-da-funcao> --project-ref <ref> --no-verify-jwt   # uma vez por pasta em supabase/functions/
+npx supabase secrets set CHAVE=valor --project-ref <ref>                        # ver lista de secrets no setup.env.example
 ```
 
-(Alternativa usada durante o desenvolvimento deste projeto: `POST https://api.supabase.com/v1/projects/<ref>/database/query` com `{"query": "<conteudo do .sql>"}` e o Personal Access Token no header `Authorization: Bearer`, uma migration de cada vez, na ordem dos nomes de arquivo.)
-
-## 3. Deploy das Edge Functions
-
-```bash
-SUPABASE_ACCESS_TOKEN=<seu-personal-access-token> npx supabase functions deploy <nome-da-funcao> --project-ref <seu-project-ref> --no-verify-jwt
-```
-
-Repita pra cada pasta dentro de `supabase/functions/` (`admin-create-company`, `admin-update-company`, `admin-delete-company`, `get-metrics`, `clear-chat-memory`, `get-calendar-token`, `save-calendar-token`, `upsert-lead`, etc — confira a lista completa no repo, pode ter crescido).
-
-## 4. Configurar os secrets das Edge Functions
-
-Algumas funções dependem de variáveis de ambiente próprias (além das automáticas `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`, que o Supabase já injeta sozinho):
-
-```bash
-npx supabase secrets set N8N_CLEAR_MEMORY_URL=https://<seu-n8n>/webhook/limpar-memoria-ia --project-ref <seu-project-ref>
-npx supabase secrets set N8N_CLEAR_MEMORY_SECRET=<escolha um segredo forte> --project-ref <seu-project-ref>
-```
-
-(O mesmo `N8N_CLEAR_MEMORY_SECRET` precisa estar configurado no workflow `limpar-memoria-chat` do n8n — ver `../n8n/`.)
-
-## 5. Evitar a pausa por inatividade (plano gratuito)
+## 3. Evitar a pausa por inatividade (plano gratuito)
 
 Se for usar o plano free do Supabase, ele pausa o projeto após 7 dias sem requisição na API. `pg_cron` rodando só dentro do banco **não conta** como atividade pra esse critério (é preciso uma requisição de verdade na API Gateway). O workflow `supabase-keep-alive` do n8n (`../n8n/workflows/supabase-keep-alive.json`) já resolve isso — só ative ele.

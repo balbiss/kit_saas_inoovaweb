@@ -2,18 +2,16 @@
 
 Stack autocontida (Postgres + Redis + bridge de WhatsApp Baileys + Chatwoot web/worker) — não depende de nenhum outro serviço além de uma rede Docker externa e um proxy reverso (Traefik, no exemplo) na frente pra TLS.
 
-## 1. Buildar a imagem do Chatwoot
+## 1. Buildar a imagem do Chatwoot (automático)
 
-A imagem do Chatwoot usada aqui **não é pública** — é um fork (`chatwoot_innovaweb`, baseado em `fazer-ai/chatwoot`) com integrações específicas deste produto. Você recebeu acesso ao código-fonte desse repo separadamente. Para buildar:
+A imagem do Chatwoot usada aqui **não é pública** — é um fork (`chatwoot_innovaweb`, baseado em `fazer-ai/chatwoot`) com integrações específicas deste produto. Você recebeu acesso ao código-fonte desse repo separadamente.
 
-```bash
-git clone <url-do-repo-chatwoot_innovaweb>
-cd chatwoot_innovaweb
-docker build -t meu-registry/chatwoot-inoovaweb:latest .
-docker push meu-registry/chatwoot-inoovaweb:latest   # ou use so a imagem local se for rodar na mesma maquina
-```
+O repo já tem um workflow do GitHub Actions (`.github/workflows/docker.yml`) que builda e publica a imagem sozinho a cada `git push` na `main` — não precisa rodar Docker local nem configurar nenhuma variável pra isso (essa imagem não leva segredo nenhum embutido no build, tudo é configurado depois via `.env` do compose). Só duas coisas na primeira vez:
 
-Use o nome/tag que você publicou como `CHATWOOT_IMAGE` no `.env`.
+1. Dê **fork** do repo `chatwoot_innovaweb` pra sua própria conta do GitHub.
+2. Abra a aba **Actions** do seu fork e clique em "I understand my workflows, go ahead and enable them" (GitHub desativa Actions em forks novos por padrão — é um clique único).
+
+Depois disso, a imagem fica disponível em `ghcr.io/<seu-usuario>/<nome-do-repo>:latest` automaticamente. Use esse nome como `CHATWOOT_IMAGE` no `.env`. Se quiser forçar um build sem esperar um push (ex: primeira vez, sem ter mudado nada ainda), vá em Actions → "Build and Push Docker Image" → "Run workflow" — ou simplesmente faça um commit vazio (`git commit --allow-empty -m "trigger build"` + `git push`).
 
 ## 2. Baileys (WhatsApp)
 
