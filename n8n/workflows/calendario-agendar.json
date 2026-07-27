@@ -87,7 +87,7 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxYmVqdmh1YXZ6amVrem5vdWFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2ODY1NDMsImV4cCI6MjEwMDI2MjU0M30.VyulYtfVCpldH4OV8uDebVQumHcLmPJzFUENUpMzDoE"
+              "value": "{{ $env.SUPABASE_ANON_KEY }}"
             }
           ]
         },
@@ -463,7 +463,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "const v = $('VALIDAR').item.json;\nif (!v.ok) { return [{ json: v }]; }\nconst bloqueios = $json || [];\nconst dataHora = $('GATILHO').item.json.data_hora_inicio || '';\nconst hh = parseInt((dataHora.split('T')[1] || '00:00').split(':')[0], 10);\nfunction periodoBate(periodo) {\n  if (periodo === 'dia_todo') return true;\n  if (periodo === 'manha') return hh < 12;\n  if (periodo === 'tarde') return hh >= 12 && hh < 18;\n  if (periodo === 'noite') return hh >= 18;\n  return false;\n}\nconst bloqueado = bloqueios.find(function(b) { return periodoBate(b.periodo); });\nif (bloqueado) {\n  const motivo = 'Agenda bloqueada nesse periodo' + (bloqueado.motivo ? ' (' + bloqueado.motivo + ')' : '') + '.';\n  return [{ json: Object.assign({}, v, { ok: false, motivo: motivo }) }];\n}\nreturn [{ json: v }];"
+        "jsCode": "const v = $('VALIDAR').item.json;\nif (!v.ok) { return [{ json: v }]; }\nconst bloqueios = $input.all().map(function(i){ return i.json; }).filter(function(b){ return b && b.periodo; });\nconst dataHora = $('GATILHO').item.json.data_hora_inicio || '';\nconst hh = parseInt((dataHora.split('T')[1] || '00:00').split(':')[0], 10);\nfunction periodoBate(periodo) {\n  if (periodo === 'dia_todo') return true;\n  if (periodo === 'manha') return hh < 12;\n  if (periodo === 'tarde') return hh >= 12 && hh < 18;\n  if (periodo === 'noite') return hh >= 18;\n  return false;\n}\nconst bloqueado = bloqueios.find(function(b) { return periodoBate(b.periodo); });\nif (bloqueado) {\n  const motivo = 'Agenda bloqueada nesse periodo' + (bloqueado.motivo ? ' (' + bloqueado.motivo + ')' : '') + '.';\n  return [{ json: Object.assign({}, v, { ok: false, motivo: motivo }) }];\n}\nreturn [{ json: v }];"
       }
     },
     {
@@ -716,7 +716,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ company_id: $('GATILHO').item.json.company_id, resource_id: $('RESOLVER PAGAMENTO AGENDAMENTO').item.json.resource_id, titulo: $('GATILHO').item.json.titulo, descricao: $('GATILHO').item.json.descricao, nome_lead: $('GATILHO').item.json.nome_lead, telefone: $('GATILHO').item.json.telefone, termo_contato: $('GATILHO').item.json.termo_contato, data_hora_inicio: $('GATILHO').item.json.data_hora_inicio, conversation_id: String($('GATILHO').item.json.id_conversa), contact_phone: $('GATILHO').item.json.telefone, valor: $('RESOLVER PAGAMENTO AGENDAMENTO').item.json.valor_sinal, status: 'pendente', tipo_cobranca: $('RESOLVER PAGAMENTO AGENDAMENTO').item.json.tipo_cobranca }) }}",
+        "jsonBody": "={{ JSON.stringify({ company_id: $('GATILHO').item.json.company_id, resource_id: $('RESOLVER PAGAMENTO AGENDAMENTO').item.json.resource_id, titulo: $('GATILHO').item.json.titulo, descricao: $('GATILHO').item.json.descricao, nome_lead: $('GATILHO').item.json.nome_lead, telefone: $('GATILHO').item.json.telefone, termo_contato: $('GATILHO').item.json.termo_contato, data_hora_inicio: $('GATILHO').item.json.data_hora_inicio, conversation_id: String($('GATILHO').item.json.id_conversa), contact_phone: $('GATILHO').item.json.telefone, valor: $('RESOLVER PAGAMENTO AGENDAMENTO').item.json.valor_sinal, status: 'pendente', appointment_id: $('SALVAR AGENDAMENTO PENDENTE').item.json.id, tipo_cobranca: $('RESOLVER PAGAMENTO AGENDAMENTO').item.json.tipo_cobranca }) }}",
         "options": {}
       }
     },
@@ -943,6 +943,135 @@
         },
         "options": {}
       }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://oauth2.googleapis.com/token",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "refresh_token",
+              "value": "={{ $('VALIDAR').item.json.refresh_token }}"
+            },
+            {
+              "name": "client_id",
+              "value": "{{ $env.GOOGLE_CLIENT_ID }}"
+            },
+            {
+              "name": "client_secret",
+              "value": "{{ $env.GOOGLE_CLIENT_SECRET }}"
+            },
+            {
+              "name": "grant_type",
+              "value": "refresh_token"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "renovar-token-pendente-lssjud",
+      "name": "RENOVAR TOKEN PENDENTE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        900,
+        132
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "var g = $('GATILHO').item.json; var v = $('VALIDAR').item.json; var access_token = $json.access_token; var duracao = parseInt(v.duracao_minutos) || 60; var inicio = g.data_hora_inicio.includes('+') || g.data_hora_inicio.includes('Z') ? g.data_hora_inicio : g.data_hora_inicio + '-03:00'; var dInicio = new Date(inicio); var dFim = new Date(dInicio.getTime() + duracao * 60000); var fim = dFim.toISOString().replace('Z', '-03:00'); var telefone = g.telefone || ''; var termo = g.termo_contato || 'Cliente'; var descParts = [termo + ': ' + g.nome_lead]; if (telefone) descParts.push('WhatsApp: ' + telefone); if (g.descricao) descParts.push(g.descricao); return [{ json: { access_token: access_token, calendar_id: v.calendar_id || 'primary', evento: { summary: '\\u23f3 Aguardando pagamento - ' + g.titulo, description: descParts.join('\\n'), status: 'tentative', start: { dateTime: inicio, timeZone: 'America/Sao_Paulo' }, end: { dateTime: fim, timeZone: 'America/Sao_Paulo' } } } }];"
+      },
+      "id": "preparar-evento-pendente-71kwaq",
+      "name": "PREPARAR EVENTO PENDENTE",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        132
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($json.calendar_id) }}/events",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.evento) }}",
+        "options": {}
+      },
+      "id": "criar-evento-pendente-zvoqk9",
+      "name": "CRIAR EVENTO PENDENTE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1380,
+        132
+      ]
+    },
+    {
+      "id": "preparar-salvar-pendente-9pu62o",
+      "name": "PREPARAR SALVAR PENDENTE",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2340,
+        132
+      ],
+      "parameters": {
+        "jsCode": "var g = $('GATILHO').item.json; var ev = $('CRIAR EVENTO PENDENTE').item.json; var v = $('VALIDAR').item.json; return [{ json: { company_id: g.company_id, resource_id: v.resource_id || null, conversation_id: g.id_conversa ? String(g.id_conversa) : null, contact_phone: g.telefone || null, title: g.titulo || null, scheduled_at: ev.start.dateTime, google_event_id: ev.id, google_event_link: ev.htmlLink || '', status: 'aguardando_pagamento' } }];"
+      }
+    },
+    {
+      "id": "salvar-agendamento-pendente-e60r33",
+      "name": "SALVAR AGENDAMENTO PENDENTE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2580,
+        132
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/appointments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -1122,14 +1251,14 @@
       "main": [
         [
           {
-            "node": "TEM TOKEN?",
+            "node": "BUSCAR PAGAMENTO PENDENTE",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "BUSCAR PAGAMENTO PENDENTE",
+            "node": "TEM TOKEN?",
             "type": "main",
             "index": 0
           }
@@ -1162,7 +1291,7 @@
       "main": [
         [
           {
-            "node": "BUSCAR CONFIG PAGAMENTO EMPRESA AGENDA",
+            "node": "RENOVAR TOKEN PENDENTE",
             "type": "main",
             "index": 0
           }
@@ -1287,6 +1416,61 @@
         [
           {
             "node": "RETORNAR PIX GERADO AGENDA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RENOVAR TOKEN PENDENTE": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR EVENTO PENDENTE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR EVENTO PENDENTE": {
+      "main": [
+        [
+          {
+            "node": "CRIAR EVENTO PENDENTE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRIAR EVENTO PENDENTE": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR SALVAR PENDENTE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR SALVAR PENDENTE": {
+      "main": [
+        [
+          {
+            "node": "SALVAR AGENDAMENTO PENDENTE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SALVAR AGENDAMENTO PENDENTE": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR CONFIG PAGAMENTO EMPRESA AGENDA",
             "type": "main",
             "index": 0
           }

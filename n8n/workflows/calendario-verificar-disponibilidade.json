@@ -89,7 +89,7 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxYmVqdmh1YXZ6amVrem5vdWFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2ODY1NDMsImV4cCI6MjEwMDI2MjU0M30.VyulYtfVCpldH4OV8uDebVQumHcLmPJzFUENUpMzDoE"
+              "value": "{{ $env.SUPABASE_ANON_KEY }}"
             }
           ]
         },
@@ -328,7 +328,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "const v = $('VALIDAR').item.json;\nif (!v.ok) { return [{ json: v }]; }\nconst bloqueios = $json || [];\nconst hora = $('GATILHO').item.json.hora_desejada || '00:00';\nconst hh = parseInt(hora.split(':')[0], 10);\nfunction periodoBate(periodo) {\n  if (periodo === 'dia_todo') return true;\n  if (periodo === 'manha') return hh < 12;\n  if (periodo === 'tarde') return hh >= 12 && hh < 18;\n  if (periodo === 'noite') return hh >= 18;\n  return false;\n}\nconst bloqueado = bloqueios.find(function(b) { return periodoBate(b.periodo); });\nif (bloqueado) {\n  const motivo = 'Agenda bloqueada nesse periodo' + (bloqueado.motivo ? ' (' + bloqueado.motivo + ')' : '') + '.';\n  return [{ json: Object.assign({}, v, { ok: false, motivo: motivo }) }];\n}\nreturn [{ json: v }];"
+        "jsCode": "const v = $('VALIDAR').item.json;\nif (!v.ok) { return [{ json: v }]; }\nconst bloqueios = $input.all().map(function(i){ return i.json; }).filter(function(b){ return b && b.periodo; });\nconst hora = $('GATILHO').item.json.hora_desejada || '00:00';\nconst hh = parseInt(hora.split(':')[0], 10);\nfunction periodoBate(periodo) {\n  if (periodo === 'dia_todo') return true;\n  if (periodo === 'manha') return hh < 12;\n  if (periodo === 'tarde') return hh >= 12 && hh < 18;\n  if (periodo === 'noite') return hh >= 18;\n  return false;\n}\nconst bloqueado = bloqueios.find(function(b) { return periodoBate(b.periodo); });\nif (bloqueado) {\n  const motivo = 'Agenda bloqueada nesse periodo' + (bloqueado.motivo ? ' (' + bloqueado.motivo + ')' : '') + '.';\n  return [{ json: Object.assign({}, v, { ok: false, motivo: motivo }) }];\n}\nreturn [{ json: v }];"
       }
     }
   ],

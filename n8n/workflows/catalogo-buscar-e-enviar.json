@@ -275,7 +275,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "var item = $input.all()[0].json;\nvar midias = item.midias || [];\nreturn midias.map(function(m){ return { json: { url: m.url, tipo: m.tipo, legenda: item.legenda } }; });"
+        "jsCode": "var item = $input.all()[0].json;\nvar midias = item.midias || [];\nreturn midias.map(function(m, idx){ return { json: { url: m.url, tipo: m.tipo, legenda: idx === 0 ? item.legenda : '' } }; });"
       }
     },
     {

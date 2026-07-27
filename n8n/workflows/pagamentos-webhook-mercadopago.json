@@ -619,7 +619,7 @@
       ],
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/agendamento_pagamentos?select=*,resources(name,calendar_id),companies(chatwoot_account_id,mercadopago_access_token)&id=eq.{{ $json.query.agendamento_pagamento_id }}",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/agendamento_pagamentos?select=*,resources(name,calendar_id),companies(chatwoot_account_id,mercadopago_access_token),appointments(id,google_event_id,title)&id=eq.{{ $json.query.agendamento_pagamento_id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -757,127 +757,6 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ status: 'pago' }) }}",
         "options": {}
-      }
-    },
-    {
-      "id": "chamar-calendario-agendar-webhook",
-      "name": "CHAMAR CALENDARIO - AGENDAR",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        1540,
-        -220
-      ],
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "cgJqoXaDZZhzPu2y",
-          "mode": "id",
-          "cachedResultName": "CALENDARIO - AGENDAR"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "titulo": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.titulo }}",
-            "data_hora_inicio": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.data_hora_inicio }}",
-            "descricao": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.descricao }}",
-            "nome_lead": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.nome_lead }}",
-            "telefone": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.telefone }}",
-            "termo_contato": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.termo_contato }}",
-            "id_conversa": "={{ Number($('BUSCAR AGENDAMENTO PAGAMENTO').item.json.conversation_id) }}",
-            "url_chatwoot": "{{ $env.CHATWOOT_URL }}",
-            "token": "{{ $env.CHATWOOT_AGENCY_TOKEN }}",
-            "company_id": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.company_id }}",
-            "chatwoot_account_id": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.companies.chatwoot_account_id }}",
-            "resource_nome": "",
-            "prompt_nicho": "",
-            "pagamento_confirmado": true,
-            "resource_id_direto": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.resource_id }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "titulo",
-              "displayName": "titulo",
-              "type": "string"
-            },
-            {
-              "id": "data_hora_inicio",
-              "displayName": "data_hora_inicio",
-              "type": "string"
-            },
-            {
-              "id": "descricao",
-              "displayName": "descricao",
-              "type": "string"
-            },
-            {
-              "id": "nome_lead",
-              "displayName": "nome_lead",
-              "type": "string"
-            },
-            {
-              "id": "telefone",
-              "displayName": "telefone",
-              "type": "string"
-            },
-            {
-              "id": "termo_contato",
-              "displayName": "termo_contato",
-              "type": "string"
-            },
-            {
-              "id": "id_conversa",
-              "displayName": "id_conversa",
-              "type": "number"
-            },
-            {
-              "id": "url_chatwoot",
-              "displayName": "url_chatwoot",
-              "type": "string"
-            },
-            {
-              "id": "token",
-              "displayName": "token",
-              "type": "string"
-            },
-            {
-              "id": "company_id",
-              "displayName": "company_id",
-              "type": "string"
-            },
-            {
-              "id": "chatwoot_account_id",
-              "displayName": "chatwoot_account_id",
-              "type": "number"
-            },
-            {
-              "id": "resource_nome",
-              "displayName": "resource_nome",
-              "type": "string"
-            },
-            {
-              "id": "prompt_nicho",
-              "displayName": "prompt_nicho",
-              "type": "string"
-            },
-            {
-              "id": "pagamento_confirmado",
-              "displayName": "pagamento_confirmado",
-              "type": "boolean"
-            },
-            {
-              "id": "resource_id_direto",
-              "displayName": "resource_id_direto",
-              "type": "string"
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {
-          "waitForSubWorkflow": true
-        }
       }
     },
     {
@@ -1042,6 +921,186 @@
         "jsonBody": "={{ JSON.stringify({ lembrete_enviado: true }) }}",
         "options": {}
       }
+    },
+    {
+      "id": "buscar-tokens-agendamento-382quj",
+      "name": "BUSCAR TOKENS AGENDAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        -100
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/functions/v1/get-calendar-token",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "company_id",
+              "value": "={{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.company_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_ANON_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "renovar-token-agendamento-9z7gjx",
+      "name": "RENOVAR TOKEN AGENDAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1760,
+        -100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://oauth2.googleapis.com/token",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "refresh_token",
+              "value": "={{ $json.refresh_token }}"
+            },
+            {
+              "name": "client_id",
+              "value": "{{ $env.GOOGLE_CLIENT_ID }}"
+            },
+            {
+              "name": "client_secret",
+              "value": "{{ $env.GOOGLE_CLIENT_SECRET }}"
+            },
+            {
+              "name": "grant_type",
+              "value": "refresh_token"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent(($('BUSCAR AGENDAMENTO PAGAMENTO').item.json.resources && $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.resources.calendar_id) || 'primary') }}/events/{{ (($('BUSCAR AGENDAMENTO PAGAMENTO').item.json.appointments || {}).google_event_id) || '' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ summary: (($('BUSCAR AGENDAMENTO PAGAMENTO').item.json.appointments || {}).title) || $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.titulo, status: 'confirmed' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "name": "ATUALIZAR EVENTO PAGO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1980,
+        -100
+      ],
+      "id": "atualizar-evento-pago-mrpm6n"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/appointments?id=eq.{{ (($('BUSCAR AGENDAMENTO PAGAMENTO').item.json.appointments || {}).id) || '00000000-0000-0000-0000-000000000000' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'agendado' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "name": "CONFIRMAR AGENDAMENTO DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2200,
+        -100
+      ],
+      "id": "confirmar-agendamento-db-80r9gh"
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "confirmacao",
+              "name": "confirmacao",
+              "type": "string",
+              "value": "=Agendado! {{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.titulo }} em {{ $('BUSCAR AGENDAMENTO PAGAMENTO').item.json.data_hora_inicio }}."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "PREPARAR CONFIRMACAO AGENDAMENTO",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2420,
+        -100
+      ],
+      "id": "preparar-confirmacao-agendamento-wq9adp"
     }
   ],
   "connections": {
@@ -1301,18 +1360,7 @@
       "main": [
         [
           {
-            "node": "CHAMAR CALENDARIO - AGENDAR",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "CHAMAR CALENDARIO - AGENDAR": {
-      "main": [
-        [
-          {
-            "node": "ENVIAR CONFIRMACAO AGENDAMENTO",
+            "node": "BUSCAR TOKENS AGENDAMENTO",
             "type": "main",
             "index": 0
           }
@@ -1357,6 +1405,61 @@
         [
           {
             "node": "MARCAR LEMBRETE ENVIADO AGENDAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR TOKENS AGENDAMENTO": {
+      "main": [
+        [
+          {
+            "node": "RENOVAR TOKEN AGENDAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RENOVAR TOKEN AGENDAMENTO": {
+      "main": [
+        [
+          {
+            "node": "ATUALIZAR EVENTO PAGO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ATUALIZAR EVENTO PAGO": {
+      "main": [
+        [
+          {
+            "node": "CONFIRMAR AGENDAMENTO DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CONFIRMAR AGENDAMENTO DB": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR CONFIRMACAO AGENDAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR CONFIRMACAO AGENDAMENTO": {
+      "main": [
+        [
+          {
+            "node": "ENVIAR CONFIRMACAO AGENDAMENTO",
             "type": "main",
             "index": 0
           }

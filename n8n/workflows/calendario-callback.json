@@ -77,7 +77,7 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxYmVqdmh1YXZ6amVrem5vdWFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2ODY1NDMsImV4cCI6MjEwMDI2MjU0M30.VyulYtfVCpldH4OV8uDebVQumHcLmPJzFUENUpMzDoE"
+              "value": "{{ $env.SUPABASE_ANON_KEY }}"
             },
             {
               "name": "Content-Type",
