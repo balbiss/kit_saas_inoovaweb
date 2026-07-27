@@ -1376,6 +1376,56 @@
         },
         "options": {}
       }
+    },
+    {
+      "id": "buscar-labels-cancelamento-u9neph",
+      "name": "BUSCAR LABELS CANCELAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1320,
+        820
+      ],
+      "parameters": {
+        "url": "={{ '{{ $env.CHATWOOT_URL }}/api/v1/accounts/' + $('BUSCAR AGENDAMENTOS PAGAMENTO PRA CANCELAR').item.json.companies.chatwoot_account_id + '/conversations/' + $('BUSCAR AGENDAMENTOS PAGAMENTO PRA CANCELAR').item.json.conversation_id + '/labels' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "{{ $env.CHATWOOT_AGENCY_TOKEN }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "definir-label-cancelamento-9f2u14",
+      "name": "DEFINIR LABEL CANCELAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1540,
+        820
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ '{{ $env.CHATWOOT_URL }}/api/v1/accounts/' + $('BUSCAR AGENDAMENTOS PAGAMENTO PRA CANCELAR').item.json.companies.chatwoot_account_id + '/conversations/' + $('BUSCAR AGENDAMENTOS PAGAMENTO PRA CANCELAR').item.json.conversation_id + '/labels' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "{{ $env.CHATWOOT_AGENCY_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ labels: Array.from(new Set([...(($json.payload) || []).filter(l => l !== 'aguardando_pagamento'), 'pagamento_expirado'])) }) }}",
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -1805,7 +1855,7 @@
       "main": [
         [
           {
-            "node": "AVISAR CANCELAMENTO AGENDAMENTO",
+            "node": "BUSCAR LABELS CANCELAMENTO",
             "type": "main",
             "index": 0
           }
@@ -1822,6 +1872,28 @@
           }
         ],
         []
+      ]
+    },
+    "BUSCAR LABELS CANCELAMENTO": {
+      "main": [
+        [
+          {
+            "node": "DEFINIR LABEL CANCELAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DEFINIR LABEL CANCELAMENTO": {
+      "main": [
+        [
+          {
+            "node": "AVISAR CANCELAMENTO AGENDAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
