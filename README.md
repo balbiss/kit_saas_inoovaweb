@@ -17,7 +17,7 @@ Se você (ou o Claude Code que estiver te ajudando) estiver começando agora, co
 Siga `supabase/README.md`: criar projeto, aplicar migrations, deploy das Edge Functions, configurar secrets.
 
 ### 2. Chatwoot + Baileys
-Siga `chatwoot/README.md`: buildar a imagem do fork do Chatwoot, preencher `.env`, subir a stack.
+Siga `chatwoot/README.md`: dar fork no repo do Chatwoot (o build da imagem já é automático via GitHub Actions), preencher `.env`, subir a stack.
 
 ### 3. n8n
 Suba um n8n limpo (imagem oficial `n8nio/n8n`, qualquer Postgres/SQLite próprio — não precisa ser o mesmo banco de nada). Configure as variáveis de ambiente do container:
@@ -40,7 +40,10 @@ Depois: `n8n/import.sh <container>` importa os 23 workflows (preservando os IDs 
 - Pegue a URL do webhook do `sdr-agente-dinamico` (é o ponto de entrada — é nele que o Chatwoot vai mandar as mensagens recebidas via automação/webhook).
 
 ### 4. Painel
-Siga `painel/README.md`: variáveis de build apontando pro seu Supabase, pontos de rebrand, deploy.
+Siga `painel/README.md`: configure as 3 variáveis do GitHub Actions apontando pro seu Supabase (o build já é automático a cada push), pontos de rebrand opcionais.
+
+## Quer entender como a automação funciona, não só seguir o passo a passo?
+Leia `COMO-FUNCIONA-A-AUTOMACAO.md` — explica cada peça (Actions, build args, script do Supabase) em linguagem simples, pensado pra quem vai explicar isso pra outras pessoas depois.
 
 ### 5. Primeira empresa de teste
 Com tudo no ar: crie a primeira empresa pelo painel (fluxo de super-admin → `admin-create-company`, que cria a conta isolada no Chatwoot automaticamente + já provisiona as etiquetas padrão), configure o prompt da IA, conecte o WhatsApp (QR code) e mande uma mensagem de teste de verdade pra validar a cadeia inteira.
