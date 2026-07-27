@@ -552,7 +552,7 @@
       ],
       "parameters": {
         "method": "PATCH",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/pedidos?id=eq.{{ $json.id }}",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/pedidos?id=eq.{{ $('BUSCAR PEDIDOS EXPIRADOS').item.json.id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -902,7 +902,7 @@
       ],
       "parameters": {
         "method": "PATCH",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/agendamento_pagamentos?id=eq.{{ $json.id }}",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/agendamento_pagamentos?id=eq.{{ $('BUSCAR AGENDAMENTOS PAGAMENTO EXPIRADOS').item.json.id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -1101,6 +1101,281 @@
         -100
       ],
       "id": "preparar-confirmacao-agendamento-wq9adp"
+    },
+    {
+      "id": "buscar-agendamentos-pagamento-pra-cancelar-k18soe",
+      "typeVersion": 4.4,
+      "name": "BUSCAR AGENDAMENTOS PAGAMENTO PRA CANCELAR",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        220,
+        680
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/agendamento_pagamentos?select=*,appointments(id,google_event_id),resources(calendar_id),companies(chatwoot_account_id)&status=eq.pendente&lembrete_enviado=eq.true&expira_em=lt.{{ $now.minus({ minutes: 30 }).toISO() }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "buscar-tokens-cancelamento-y5zkbn",
+      "typeVersion": 4.4,
+      "name": "BUSCAR TOKENS CANCELAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        440,
+        680
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/functions/v1/get-calendar-token",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "company_id",
+              "value": "={{ $('BUSCAR AGENDAMENTOS PAGAMENTO PRA CANCELAR').item.json.company_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_ANON_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "renovar-token-cancelamento-4j46pc",
+      "typeVersion": 4.4,
+      "name": "RENOVAR TOKEN CANCELAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        660,
+        680
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://oauth2.googleapis.com/token",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "refresh_token",
+              "value": "={{ $json.refresh_token }}"
+            },
+            {
+              "name": "client_id",
+              "value": "{{ $env.GOOGLE_CLIENT_ID }}"
+            },
+            {
+              "name": "client_secret",
+              "value": "{{ $env.GOOGLE_CLIENT_SECRET }}"
+            },
+            {
+              "name": "grant_type",
+              "value": "refresh_token"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "deletar-evento-cancelado-myucib",
+      "typeVersion": 4.4,
+      "name": "DELETAR EVENTO CANCELADO",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        880,
+        680
+      ],
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent(($('BUSCAR AGENDAMENTOS PAGAMENTO PRA CANCELAR').item.json.resources && $('BUSCAR AGENDAMENTOS PAGAMENTO PRA CANCELAR').item.json.resources.calendar_id) || 'primary') }}/events/{{ (($('BUSCAR AGENDAMENTOS PAGAMENTO PRA CANCELAR').item.json.appointments || {}).google_event_id) || '' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "cancelar-appointment-db-27z4eu",
+      "typeVersion": 4.4,
+      "name": "CANCELAR APPOINTMENT DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1100,
+        680
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/appointments?id=eq.{{ (($('BUSCAR AGENDAMENTOS PAGAMENTO PRA CANCELAR').item.json.appointments || {}).id) || '00000000-0000-0000-0000-000000000000' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'cancelado' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "cancelar-pagamento-db-fen9hq",
+      "typeVersion": 4.4,
+      "name": "CANCELAR PAGAMENTO DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1320,
+        680
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/agendamento_pagamentos?id=eq.{{ $('BUSCAR AGENDAMENTOS PAGAMENTO PRA CANCELAR').item.json.id }}&status=eq.pendente",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'expirado' }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "avisar-cancelamento-agendamento-ai5olg",
+      "typeVersion": 4.4,
+      "name": "AVISAR CANCELAMENTO AGENDAMENTO",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1540,
+        680
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ '{{ $env.CHATWOOT_URL }}/api/v1/accounts/' + $('BUSCAR AGENDAMENTOS PAGAMENTO PRA CANCELAR').item.json.companies.chatwoot_account_id + '/conversations/' + $('BUSCAR AGENDAMENTOS PAGAMENTO PRA CANCELAR').item.json.conversation_id + '/messages' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "{{ $env.CHATWOOT_AGENCY_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: 'Como o pagamento nao foi feito a tempo, liberamos esse horario. Se ainda quiser agendar, e so me chamar que a gente ve um novo horario disponivel.', message_type: 'outgoing', private: false }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "tem-pedido-expirado-124z1j",
+      "name": "TEM PEDIDO EXPIRADO?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -1268,6 +1543,11 @@
             "node": "BUSCAR AGENDAMENTOS PAGAMENTO EXPIRADOS",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "BUSCAR AGENDAMENTOS PAGAMENTO PRA CANCELAR",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -1276,7 +1556,7 @@
       "main": [
         [
           {
-            "node": "ENVIAR LEMBRETE PIX",
+            "node": "TEM PEDIDO EXPIRADO?",
             "type": "main",
             "index": 0
           }
@@ -1464,6 +1744,84 @@
             "index": 0
           }
         ]
+      ]
+    },
+    "BUSCAR AGENDAMENTOS PAGAMENTO PRA CANCELAR": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR TOKENS CANCELAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR TOKENS CANCELAMENTO": {
+      "main": [
+        [
+          {
+            "node": "RENOVAR TOKEN CANCELAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RENOVAR TOKEN CANCELAMENTO": {
+      "main": [
+        [
+          {
+            "node": "DELETAR EVENTO CANCELADO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DELETAR EVENTO CANCELADO": {
+      "main": [
+        [
+          {
+            "node": "CANCELAR APPOINTMENT DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CANCELAR APPOINTMENT DB": {
+      "main": [
+        [
+          {
+            "node": "CANCELAR PAGAMENTO DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CANCELAR PAGAMENTO DB": {
+      "main": [
+        [
+          {
+            "node": "AVISAR CANCELAMENTO AGENDAMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEM PEDIDO EXPIRADO?": {
+      "main": [
+        [
+          {
+            "node": "ENVIAR LEMBRETE PIX",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     }
   },
