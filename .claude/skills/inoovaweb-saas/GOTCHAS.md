@@ -54,3 +54,21 @@ O Mercado Pago manda a notificação de pagamento MAIS DE UMA VEZ (comportamento
 ## Decodificar execução do n8n via script de dedup tem falso-positivo conhecido
 
 Se algum dia for necessário decodificar o JSON de uma execução do n8n via um script que resolve índices de array deduplicado, saiba que campos legítimos só-de-dígitos (ex: `chatwoot_account_id: "1"`) podem ficar corrompidos no dump (viram objetos aleatórios do array de dedup), mesmo os dados reais em produção estando certos. Ao ver um campo obviamente errado no dump decodificado, suspeitar do script antes de assumir bug real — conferir direto via chamada de API quando a dúvida for sobre um valor simples.
+
+## Chatwoot: atribuição de time + agente precisa de duas chamadas separadas
+
+`POST /api/v1/accounts/{id}/conversations/{id}/assignments` aceita `team_id` e `assignee_id`, mas mandados **juntos na mesma chamada**, só o `assignee_id` é aplicado — o `team_id` fica silenciosamente `nil`, mesmo com HTTP 200 e a resposta parecendo de sucesso. Sempre fazer duas chamadas POST separadas (uma só com `team_id`, a próxima só com `assignee_id`).
+
+Também: `PATCH /conversations/{id}` (o endpoint genérico de update) aceita `team_id` no corpo e devolve 200, mas o Rails ignora silenciosamente esse parâmetro por não estar nos strong params dessa action — nunca funciona pra atribuir time, só o endpoint `/assignments` funciona.
+
+Se a dúvida for "isso realmente gravou?" e a resposta da API não expuser o campo de volta, confirmar via Rails console (`bundle exec rails runner "puts Conversation.find(id).team_id"`, rodado dentro do container via `docker exec`/Portainer) em vez de confiar só no HTTP 200.
+
+## Chatwoot: agente precisa ser membro do TIME e da CAIXA DE ENTRADA (são coisas separadas)
+
+Um agente pode estar corretamente atribuído a uma conversa (`assignee_id` certo no banco) e mesmo assim não aparecer como "assignable" pra aquela caixa de entrada, ou não conseguir interagir direito com a conversa, se ele não for membro da **inbox** também. São duas permissões independentes no Chatwoot — adicionar num time (`POST/PATCH /team_members`) não adiciona na caixa de entrada. Pra adicionar: `PATCH /api/v1/accounts/{id}/inbox_members` com `{inbox_id, user_ids: [...]}` (substitui a lista inteira de membros daquela inbox, sempre incluir os que já estavam).
+
+## Chatwoot: VAPID (push notification) é guardado no banco, não lido de env var toda vez
+
+`VapidService` (`/app/lib/vapid_service.rb`) só lê a variável de ambiente `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` na primeira vez que precisa gerar o par de chaves — depois disso salva num registro `InstallationConfig` (`name: "VAPID_KEYS"`) e usa esse pra sempre, ignorando a env var completamente em qualquer deploy futuro. Se precisar trocar a chave VAPID depois da instalação inicial, mudar a env var não faz nada — precisa atualizar/apagar esse registro direto no banco.
+
+Além disso, aceitar a permissão de notificação no navegador **não é suficiente** pro Chatwoot mandar push de verdade — a conta do usuário também precisa ter a flag do evento específico marcada em `notification_settings` (`push_flags`, um bitmask via FlagShihTzu que **vem zerado por padrão** pra qualquer usuário novo). As duas coisas são independentes: permissão do navegador (`Notification.permission`) e preferência da conta (`selected_push_flags`).

@@ -10,9 +10,9 @@ Os 23 workflows deste kit (pasta `n8n/workflows/`), com o que cada um faz e quem
 
 ## Catálogo de produtos
 
-- **catalogo-buscar-produto** — tool `buscar_produto`: busca um produto específico por nome (fuzzy matching).
+- **catalogo-buscar-produto** — tool `buscar_produto`: busca um produto específico por nome (fuzzy matching). Retorna também `midias` (galeria de fotos/vídeos adicionais além da foto de capa, tabela `product_media`).
 - **catalogo-enviar-foto** — tool `enviar_foto`: envia a foto de um produto já identificado.
-- **catalogo-buscar-e-enviar** — tool `buscar_e_enviar`: busca por palavra-chave livre no catálogo (ou lista tudo) e manda o resultado.
+- **catalogo-buscar-e-enviar** — tool `buscar_e_enviar`: busca por palavra-chave livre no catálogo (ou lista tudo) e manda o resultado. Se o produto encontrado tiver galeria (`product_media`) além da foto de capa, manda a capa + todos os itens da galeria em sequência automaticamente (fan-out interno, a IA não precisa chamar nada extra).
 - **catalogo-buscar-e-enviar-documento** — tool `buscar_e_enviar_documento`: mesma lógica pra documentos/PDFs cadastrados.
 
 ## Agendamento (Google Calendar)
@@ -32,10 +32,10 @@ Os 23 workflows deste kit (pasta `n8n/workflows/`), com o que cada um faz e quem
 
 ## Atendimento e relacionamento
 
-- **atendimento-transferir-humano** — tool `transferir_humano`: atribui a conversa a um time do Chatwoot (respeitando horário de atendimento configurável por empresa) e define prioridade.
+- **atendimento-transferir-humano** — tool `transferir_humano`: atribui a conversa a um TIME do Chatwoot (respeitando horário de atendimento configurável por empresa), escolhe e atribui um AGENTE do time (prefere online, depois ocupado, depois o primeiro do time) e define prioridade alta. **Nota de API do Chatwoot**: `team_id` e `assignee_id` precisam ir em duas chamadas POST `/assignments` separadas — mandados juntos na mesma chamada, o Chatwoot só aplica o `assignee_id` e descarta o `team_id` silenciosamente (sem erro nenhum). Também adiciona a etiqueta `falar_humano`, que já bloqueia a IA de continuar respondendo (ver `sdr-agente-dinamico`) e também para qualquer follow-up automático já agendado pra essa conversa.
 - **reagir-mensagem** — tool `reagir_mensagem`: reage com emoji numa mensagem do Chatwoot.
 - **limpar-memoria-chat** — webhook chamado pela edge function `clear-chat-memory` (botão "Limpar memória" no painel, por contato): apaga só o histórico daquele telefone+empresa (nunca a tabela inteira).
-- **followup-automatico** — sequência de follow-up quando o lead não responde (tentativas configuráveis por empresa). Usa a etiqueta `followup_ativo` como trava pra nunca rodar duas sequências em paralelo pro mesmo contato, e decide via IA (lendo o histórico) se ainda faz sentido insistir antes de gerar a mensagem.
+- **followup-automatico** — sequência de follow-up quando o lead não responde (tentativas configuráveis por empresa). Usa a etiqueta `followup_ativo` como trava pra nunca rodar duas sequências em paralelo pro mesmo contato, e decide via IA (lendo o histórico) se ainda faz sentido insistir antes de gerar a mensagem. Para automaticamente se a conversa tiver `agente_off`, `falar_humano`, `pago` ou `confirmado` (objetivo já alcançado ou humano assumiu) — se um agente quiser que a IA/follow-up volte a agir, basta remover a etiqueta manualmente no Chatwoot.
 - **reengajamento-lead-frio** — roda 1x/dia, reengaja conversas frias/nunca qualificadas.
 
 ## Infra
