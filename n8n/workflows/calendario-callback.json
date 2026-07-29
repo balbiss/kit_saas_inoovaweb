@@ -41,15 +41,15 @@
             },
             {
               "name": "client_id",
-              "value": "{{ $env.GOOGLE_CLIENT_ID }}"
+              "value": "={{ $env.GOOGLE_CLIENT_ID }}"
             },
             {
               "name": "client_secret",
-              "value": "{{ $env.GOOGLE_CLIENT_SECRET }}"
+              "value": "={{ $env.GOOGLE_CLIENT_SECRET }}"
             },
             {
               "name": "redirect_uri",
-              "value": "{{ $env.N8N_URL }}/webhook/calendario-callback"
+              "value": "={{ $env.N8N_URL }}/webhook/calendario-callback"
             },
             {
               "name": "grant_type",
@@ -77,7 +77,7 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "{{ $env.SUPABASE_ANON_KEY }}"
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
             },
             {
               "name": "Content-Type",

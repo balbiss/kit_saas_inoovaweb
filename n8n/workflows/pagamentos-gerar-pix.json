@@ -64,7 +64,7 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
             },
             {
               "name": "Authorization",
@@ -93,7 +93,7 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
             },
             {
               "name": "Authorization",
@@ -188,7 +188,7 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
             },
             {
               "name": "Authorization",
@@ -262,7 +262,7 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
             },
             {
               "name": "Authorization",

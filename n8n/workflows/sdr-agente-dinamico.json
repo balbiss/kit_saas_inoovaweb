@@ -25,7 +25,7 @@
             {
               "id": "67928c6f-ed77-4c20-b1cd-0cf7220ed12c",
               "name": "URL_CHATWOOT",
-              "value": "{{ $env.CHATWOOT_URL }}",
+              "value": "={{ $env.CHATWOOT_URL }}",
               "type": "string"
             },
             {
@@ -137,7 +137,7 @@
           "conditions": [
             {
               "id": "829b1444-1fa5-4d0e-9e06-fa02668d2507",
-              "leftValue": "={{ $json.TIPO_DE_MENSAGEM }}",
+              "leftValue": "={{ $('INFORMAÇÕES').item.json.TIPO_DE_MENSAGEM }}",
               "rightValue": "incoming",
               "operator": {
                 "type": "string",
@@ -146,7 +146,7 @@
             },
             {
               "id": "07743261-62a5-4dfc-af29-424d5abd2f7d",
-              "leftValue": "={{ $json.body.conversation.labels }}",
+              "leftValue": "={{ $('INFORMAÇÕES').item.json.body.conversation.labels }}",
               "rightValue": "agente_off",
               "operator": {
                 "type": "array",
@@ -156,7 +156,7 @@
             },
             {
               "id": "falar-humano-block",
-              "leftValue": "={{ $json.body.conversation.labels }}",
+              "leftValue": "={{ $('INFORMAÇÕES').item.json.body.conversation.labels }}",
               "rightValue": "falar_humano",
               "operator": {
                 "type": "array",
@@ -1578,7 +1578,7 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "{{ $env.SUPABASE_ANON_KEY }}"
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
             }
           ]
         },
@@ -1610,7 +1610,7 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "{{ $env.SUPABASE_ANON_KEY }}"
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
             },
             {
               "name": "Content-Type",
@@ -1910,6 +1910,45 @@
         "jsonBody": "={{ JSON.stringify({ labels: Array.from(new Set([...(($json.payload) || []), 'followup_ativo'])) }) }}",
         "options": {}
       }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/processed_messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=ignore-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message_id: $json.MESSAGE_ID, account_id: $json.ID_CONTA }) }}",
+        "options": {}
+      },
+      "id": "idempotencia-marcar-mensagem-node",
+      "name": "IDEMPOTENCIA - MARCAR MENSAGEM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2496,
+        192
+      ]
     }
   ],
   "connections": {
@@ -1928,7 +1967,7 @@
       "main": [
         [
           {
-            "node": "PREOCESSAR MENSAGEM",
+            "node": "IDEMPOTENCIA - MARCAR MENSAGEM",
             "type": "main",
             "index": 0
           }
@@ -2291,6 +2330,17 @@
         [
           {
             "node": "FOLLOW-UP AUTOMATICO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IDEMPOTENCIA - MARCAR MENSAGEM": {
+      "main": [
+        [
+          {
+            "node": "PREOCESSAR MENSAGEM",
             "type": "main",
             "index": 0
           }

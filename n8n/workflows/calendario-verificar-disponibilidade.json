@@ -51,7 +51,7 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
             },
             {
               "name": "Authorization",
@@ -89,7 +89,7 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "{{ $env.SUPABASE_ANON_KEY }}"
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
             }
           ]
         },
@@ -167,11 +167,11 @@
             },
             {
               "name": "client_id",
-              "value": "{{ $env.GOOGLE_CLIENT_ID }}"
+              "value": "={{ $env.GOOGLE_CLIENT_ID }}"
             },
             {
               "name": "client_secret",
-              "value": "{{ $env.GOOGLE_CLIENT_SECRET }}"
+              "value": "={{ $env.GOOGLE_CLIENT_SECRET }}"
             },
             {
               "name": "grant_type",
@@ -307,7 +307,7 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
             },
             {
               "name": "Authorization",
