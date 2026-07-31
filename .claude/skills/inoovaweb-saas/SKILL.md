@@ -42,3 +42,11 @@ A UI do n8n é lenta pra edições grandes/repetitivas. Sem MCP disponível, o f
 ## Reaproveitar antes de criar
 
 Antes de escrever lógica nova, procurar se já existe um padrão pra isso: busca fuzzy por nome (ver `GOTCHAS.md`), geração/confirmação de Pix (`pagamentos-gerar-pix.json` + `pagamentos-webhook-mercadopago.json`), atribuição de time (`atendimento-transferir-humano.json`), trava de estado via etiqueta do Chatwoot (`followup_ativo`, `aguardando_pagamento` — ver como o follow-up usa isso pra não disparar em paralelo).
+
+## Buffer de mensagens (debounce de 8s) no `SDR AGENTE - DINAMICO`
+
+Antes de responder, o SDR agrupa mensagens seguidas do mesmo contato numa janela de 8 segundos, em vez de responder cada mensagem separada (evita a IA "cortar" o cliente no meio de uma sequência rápida de mensagens — ex: "oi" + "tudo bem?" + "queria saber sobre X" mandadas em 3 segundos geravam 3 respostas fragmentadas antes desse patch). Tabela `message_buffer` (`conversation_id` PK, `messages` jsonb, `last_message_at`) guarda o acumulado por conversa; só o `service_role` (n8n) mexe nela.
+
+Fluxo (entre `SALVAR LEAD` e `AI Agent  SDR`): grava a mensagem atual no buffer (append) → espera 8s (node Wait) → reconsulta o buffer → **se `last_message_at` ainda é o mesmo que a gente escreveu**, essa é a última mensagem da janela: junta tudo com `\n`, limpa o buffer, segue pro AI Agent. **Se mudou** (chegou mensagem nova durante a espera), aborta em silêncio — a execução disparada pela mensagem mais nova é quem vai responder por todo o grupo. Mesmo princípio de "comparar timestamp pra saber se ainda sou o mais recente" que a idempotência usa pra message_id (ver acima), aplicado a debounce em vez de dedup.
+
+Se for portar esse padrão pra outro workflow que responde por webhook, os nodes começam com prefixo `BUFFER -` — copiar a cadeia inteira (`BUFFER - BUSCAR ATUAL` → `BUFFER - SALVAR MENSAGEM` → `BUFFER - AGUARDAR 8s` → `BUFFER - CONFIRMAR ULTIMA` → `BUFFER - E O ULTIMO?` → `BUFFER - CONSOLIDAR MENSAGEM` → `BUFFER - LIMPAR`) é mais seguro que reescrever do zero.
