@@ -18,14 +18,20 @@ SaaS multi-tenant de atendimento via WhatsApp com IA. Qualquer nicho (clínica, 
 
 Ver `WORKFLOWS.md` neste skill pro mapa completo dos workflows do n8n e o que cada um faz. Ver `GOTCHAS.md` pros padrões técnicos e armadilhas já descobertas — leia antes de editar qualquer workflow.
 
+## Prefira sempre o MCP do n8n quando disponível
+
+Se essa instância do n8n já tem um servidor MCP conectado (`claude mcp list` mostra ele "Connected"), **use as ferramentas MCP em vez de montar chamadas REST cruas** pra ler/editar/ativar workflows, credenciais e execuções — é mais confiável e menos sujeito a erro de payload do que os scripts REST abaixo. Só caia pro REST cru (o resto desta seção) se o MCP não estiver disponível/conectado pra essa instância, ou se a ferramenta MCP não cobrir o que você precisa fazer.
+
+Cada instalação nova precisa do próprio servidor MCP registrado (não é compartilhado entre clientes): gerar o token via `GET /rest/mcp/api-key` (cria automaticamente se não existir) + `POST /rest/mcp/api-key/rotate` (retorna o JWT completo, só aparece uma vez), depois `claude mcp add-json <nome> '{"type":"http","url":"https://<n8n-do-cliente>/mcp-server/http","headers":{"Authorization":"Bearer <token>"}}'`. **Se der erro `"MCP access is disabled"` mesmo com o token certo**: 🛑 PARE E PEÇA pro usuário habilitar em `Settings → Instance-level MCP` (toggle "Enabled" + aba "Workflows" → selecionar tudo → "Enable workflows", clicando em cada workflow no modal de busca) — ver `GOTCHAS.md` ("MCP nativo do n8n") pro passo a passo exato. Isso é uma etapa manual na UI, não tem endpoint REST conhecido pra automatizar.
+
 ## Como editar um workflow do n8n com segurança (o fluxo usado o tempo todo)
 
-A UI do n8n é lenta pra edições grandes/repetitivas. O fluxo que funciona:
+A UI do n8n é lenta pra edições grandes/repetitivas. Sem MCP disponível, o fluxo REST que funciona:
 
 1. `GET /rest/workflows/{id}` (autenticado por cookie de sessão — login normal na UI e reaproveitar o cookie, não existe API key separada pra isso) pra pegar o JSON completo do workflow.
 2. Editar o JSON localmente (node/script), tipicamente fazendo substituição de string em `parameters.jsCode` (Code nodes) ou `parameters.url`/`jsonBody` (HTTP Request nodes) — mais confiável que tentar reconstruir o node inteiro.
 3. `PATCH /rest/workflows/{id}` com `{name, nodes, connections, settings}` de volta.
-4. **Sempre** `POST /rest/workflows/{id}/deactivate` seguido de `POST /rest/workflows/{id}/activate` com o `versionId` retornado pelo deactivate. Sem isso, o n8n continua rodando o código ANTIGO em cache mesmo o PATCH tendo retornado sucesso — esse passo não é opcional.
+4. **Sempre** re-publicar depois: `GET /rest/workflows/{id}` pra pegar o `versionId` atual, depois `POST /rest/workflows/{id}/activate` com `{"versionId": "<esse valor>"}`. **`PATCH .../workflows/{id}` com `{"active":true}` sozinho NÃO é suficiente nas versões recentes do n8n** — retorna 200 mas o workflow continua com `active:false`/`triggerCount:0` de verdade (webhook nem responde). Se o workflow chamar sub-workflows, publicar pode falhar pedindo pra publicar as dependências primeiro — ver `GOTCHAS.md` ("n8n exige publicar workflow") pro script que resolve isso em rounds.
 5. Depois de editar um Code node, vale rodar `node --check arquivo.js` no conteúdo extraído do `jsCode` antes de publicar — pega erro de sintaxe introduzido por substituição de string mal calculada.
 
 ## Testando
