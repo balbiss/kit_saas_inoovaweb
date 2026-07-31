@@ -1988,7 +1988,8 @@
       "position": [
         -788,
         436
-      ]
+      ],
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -2090,7 +2091,8 @@
       "position": [
         -8,
         436
-      ]
+      ],
+      "alwaysOutputData": true
     },
     {
       "parameters": {
