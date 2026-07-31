@@ -2027,7 +2027,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ conversation_id: $('SDR').item.json.body.conversation.id, account_id: $('SDR').item.json.body.account.id, messages: [...(($('BUFFER - BUSCAR ATUAL').item.json[0] || {}).messages || []), $('COLETAR MENSAGENS').item.json.MENSAGEM], last_message_at: $now.toISO() }) }}",
+        "jsonBody": "={{ JSON.stringify({ conversation_id: $('SDR').item.json.body.conversation.id, account_id: $('SDR').item.json.body.account.id, messages: [...(($('BUFFER - BUSCAR ATUAL').item.json || {}).messages || []), $('COLETAR MENSAGENS').item.json.MENSAGEM], last_message_at: $now.toISO() }) }}",
         "options": {}
       },
       "id": "c309cd88-c5f3-422d-aa87-62c45238371f",
@@ -2105,12 +2105,12 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ $json[0].last_message_at }}",
+              "leftValue": "={{ $json.last_message_at }}",
               "operator": {
                 "type": "string",
                 "operation": "equals"
               },
-              "rightValue": "={{ $('BUFFER - SALVAR MENSAGEM').item.json[0].last_message_at }}"
+              "rightValue": "={{ $('BUFFER - SALVAR MENSAGEM').item.json.last_message_at }}"
             }
           ],
           "combinator": "and"
@@ -2133,7 +2133,7 @@
             {
               "id": "d9f76786-ffd7-4188-b3f3-c9485c5f1447",
               "name": "MENSAGEM",
-              "value": "={{ $('BUFFER - CONFIRMAR ULTIMA').item.json[0].messages.join('\\n') }}",
+              "value": "={{ $('BUFFER - CONFIRMAR ULTIMA').item.json.messages.join('\\n') }}",
               "type": "string"
             }
           ]
