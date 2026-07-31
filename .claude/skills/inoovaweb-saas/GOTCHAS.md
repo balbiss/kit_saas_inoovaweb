@@ -8,6 +8,8 @@ Quando um node `httpRequest` recebe um array JSON com N elementos (comum em resp
 
 **Como aplicar**: usar `$('NomeDoNode').all().map(i => i.json)` pra pegar TODOS os itens, nunca `.item.json` quando o node anterior pode retornar mais de 1 registro.
 
+**Caso N=1 é o mais traiçoeiro** (bug real no buffer de mensagens, ver `SKILL.md`): pra uma resposta com EXATAMENTE 1 elemento, o n8n desembrulha em 1 item cujo `.json` já É o objeto diretamente — `$('Node').item.json[0]` (indexando de novo, "pra garantir") é o erro oposto e igualmente silencioso: `.json[0]` num objeto retorna `undefined`, cai em qualquer fallback (`|| {}`, `|| []`) sem erro nenhum, e o bug fica invisível porque tudo continua rodando "com sucesso" — só o RESULTADO fica sempre vazio/errado. Regra geral: depois de um `httpRequest` que bate numa tabela via `select=`, `.item.json` já é o registro (se 1) ou o node não teve item nenhum (se 0, ver `alwaysOutputData` abaixo) — nunca indexar com `[0]` a não ser que esteja explicitamente iterando `.all()`.
+
 ## Code node em `runOnceForEachItem` não pode fazer fan-out
 
 Se o código faz `return arrayDeVariosItens` tentando expandir 1 item de entrada em N de saída, o n8n quebra com erro tipo "A 'json' property isn't an object", mesmo com o código sintaticamente correto.
