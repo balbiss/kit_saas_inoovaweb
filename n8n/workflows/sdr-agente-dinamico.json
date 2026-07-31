@@ -1949,6 +1949,240 @@
         -2496,
         192
       ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/message_buffer",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "conversation_id",
+              "value": "=eq.{{ $('SDR').item.json.body.conversation.id }}"
+            },
+            {
+              "name": "select",
+              "value": "messages"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f514728a-3e4e-45e0-8256-c62c4b753ba3",
+      "name": "BUFFER - BUSCAR ATUAL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -788,
+        436
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/message_buffer",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "on_conflict",
+              "value": "conversation_id"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ conversation_id: $('SDR').item.json.body.conversation.id, account_id: $('SDR').item.json.body.account.id, messages: [...(($('BUFFER - BUSCAR ATUAL').item.json[0] || {}).messages || []), $('COLETAR MENSAGENS').item.json.MENSAGEM], last_message_at: $now.toISO() }) }}",
+        "options": {}
+      },
+      "id": "c309cd88-c5f3-422d-aa87-62c45238371f",
+      "name": "BUFFER - SALVAR MENSAGEM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -528,
+        436
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 8
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "id": "68848ddc-2008-47ba-8c17-5475631ee0f4",
+      "name": "BUFFER - AGUARDAR 8s",
+      "position": [
+        -268,
+        436
+      ],
+      "webhookId": "60c54b44-414f-452d-af04-5d1e9ec5750a"
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/message_buffer",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "conversation_id",
+              "value": "=eq.{{ $('SDR').item.json.body.conversation.id }}"
+            },
+            {
+              "name": "select",
+              "value": "messages,last_message_at"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "17472722-7e44-400a-91f3-89b588c94e39",
+      "name": "BUFFER - CONFIRMAR ULTIMA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -8,
+        436
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json[0].last_message_at }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "={{ $('BUFFER - SALVAR MENSAGEM').item.json[0].last_message_at }}"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "733c3f04-f24d-4ddd-98a4-69ed3dc8fd96",
+      "name": "BUFFER - E O ULTIMO?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        252,
+        436
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d9f76786-ffd7-4188-b3f3-c9485c5f1447",
+              "name": "MENSAGEM",
+              "value": "={{ $('BUFFER - CONFIRMAR ULTIMA').item.json[0].messages.join('\\n') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "abc14256-4d67-46d1-9804-df0537c7ea40",
+      "name": "BUFFER - CONSOLIDAR MENSAGEM",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        512,
+        436
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/message_buffer",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "conversation_id",
+              "value": "=eq.{{ $('SDR').item.json.body.conversation.id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5f309a5e-7543-421b-a31e-306998442b32",
+      "name": "BUFFER - LIMPAR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        772,
+        496
+      ]
     }
   ],
   "connections": {
@@ -2267,7 +2501,7 @@
       "main": [
         [
           {
-            "node": "AI Agent  SDR",
+            "node": "BUFFER - BUSCAR ATUAL",
             "type": "main",
             "index": 0
           }
@@ -2341,6 +2575,84 @@
         [
           {
             "node": "PREOCESSAR MENSAGEM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUFFER - BUSCAR ATUAL": {
+      "main": [
+        [
+          {
+            "node": "BUFFER - SALVAR MENSAGEM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUFFER - SALVAR MENSAGEM": {
+      "main": [
+        [
+          {
+            "node": "BUFFER - AGUARDAR 8s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUFFER - AGUARDAR 8s": {
+      "main": [
+        [
+          {
+            "node": "BUFFER - CONFIRMAR ULTIMA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUFFER - CONFIRMAR ULTIMA": {
+      "main": [
+        [
+          {
+            "node": "BUFFER - E O ULTIMO?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUFFER - E O ULTIMO?": {
+      "main": [
+        [
+          {
+            "node": "BUFFER - CONSOLIDAR MENSAGEM",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "BUFFER - CONSOLIDAR MENSAGEM": {
+      "main": [
+        [
+          {
+            "node": "BUFFER - LIMPAR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUFFER - LIMPAR": {
+      "main": [
+        [
+          {
+            "node": "AI Agent  SDR",
             "type": "main",
             "index": 0
           }
